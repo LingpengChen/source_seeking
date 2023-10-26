@@ -71,6 +71,7 @@ class Controller(object): # python (x,y) therefore col index first, row next
         self.neighbour = None  
         self.responsible_region = np.zeros((self.row, self.col))
         print("Controller Succcessfully Initialized! Initial position is: ", start_position)
+        self.sent_samples = []
     
     # step 1 (update neighbour postions + know responsible region + exchange samples)
     def voronoi_update(self, neighour_robot_index, robots_locations): # set responsible region and neighbours
@@ -102,29 +103,36 @@ class Controller(object): # python (x,y) therefore col index first, row next
                 self.responsible_region[x, y] = 1
 
         # 3) exchange samples
-        exchange_dictionary = {}
+        exchange_dictionary_X = {}
+        exchange_dictionary_y = {}
+        
         closest_point_index_list = []
         
+        sample_index = 0
         for sample in self.samples_X:
-            distances = [distance.euclidean(sample, robo) for robo in robots_locations]
-            # 找到距离最近的生成点的索引
-            closest_point_index = np.argmin(distances)
-            closest_point_index_list.append(closest_point_index)
-            
-            if closest_point_index != self.index:
-                if closest_point_index not in exchange_dictionary:
-                    exchange_dictionary[closest_point_index] = []  # 如果不存在，则初始化一个空列表
-                exchange_dictionary[closest_point_index].append(sample)
-        # print(closest_point_index_list)
-        # print(robots_locations)
-        # print(self.samples_X)
-        # print("-------")
-        return exchange_dictionary
-    
-    def receive_samples(self, exchanged_samples):
-        if exchanged_samples is not None:
-            self.samples_X = np.concatenate((self.samples_X, exchanged_samples), axis=0)
+            if sample.tolist() not in self.sent_samples:
+                distances = [distance.euclidean(sample, robo) for robo in robots_locations]
+                # 找到距离最近的生成点的索引
+                closest_point_index = np.argmin(distances)
+                closest_point_index_list.append(closest_point_index)
+                
+                if closest_point_index != self.index:
+                    if closest_point_index not in exchange_dictionary_X:
+                        exchange_dictionary_X[closest_point_index] = []
+                        exchange_dictionary_y[closest_point_index] = []  # 如果不存在，则初始化一个空列表
+                    exchange_dictionary_X[closest_point_index].append(sample)
+                    exchange_dictionary_y[closest_point_index].append(self.samples_Y[sample_index])
+                    
+                    self.sent_samples.append(sample.tolist())
+            sample_index += 1
 
+        return exchange_dictionary_X, exchange_dictionary_y
+    
+    def receive_samples(self, exchanged_samples_X, exchanged_samples_y):
+        if exchanged_samples_X is not None:
+            self.samples_X = np.concatenate((self.samples_X, exchanged_samples_X), axis=0)
+            self.samples_Y = np.concatenate((self.samples_Y, exchanged_samples_y), axis=0)
+   
     # step 2
     def gp_regresssion(self, samples, sample_values): # return the partial distribution
         # if (len(samples) != 0):
@@ -142,7 +150,19 @@ class Controller(object): # python (x,y) therefore col index first, row next
         # gp.fit(X_train, y_train)
         return
         
+    def send_out_phik(self):
+        ck = self.Erg_ctrl.get_ck()
+        if ck is not None:
+            return ck 
     
+    def receive_phik_consensus(self, ck_pack):
+        my_ck = self.Erg_ctrl.get_ck()
+        if my_ck is not None:
+            cks = [my_ck]
+            for neighbour_index in self.neighbour:
+                cks.append(ck_pack[neighbour_index])
+            ck_mean = np.mean(cks, axis=0)
+            self.Erg_ctrl.receieve_consensus_ck(ck_mean)
     
     
    
@@ -183,6 +203,8 @@ class Controller(object): # python (x,y) therefore col index first, row next
         self.trajectory = self.trajectory + setpoints
         setpoints = np.array(setpoints)
         self.samples_X = np.concatenate((self.samples_X, setpoints), axis=0)
+        self.samples_Y = np.concatenate((self.samples_Y, [f(setpoints)]), axis=0)
+        
         return setpoints
     
     def get_trajectory(self):

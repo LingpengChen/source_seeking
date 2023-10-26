@@ -92,33 +92,46 @@ def main():
         print(iteration)
         
         ## 1 update vonoroi tessellation
-        # 1-1 find the neighbours of each robot
-        robot_locations.clear()
-        for i in range(robo_num):
-            robot_locations.append(Robots[i].get_trajectory()[-1])
-        neighbour_list = voronoi_neighbours(robot_locations)
-        # 1-2 update voronoi cell info to each agents and exchange samples 
-        exchange_dictionary = {}
-        for i in range(robo_num):
-            temp_dictionary = Robots[i].voronoi_update(neighbour_list[i], robot_locations)
-            for k, v in temp_dictionary.items():
-                # 如果键还不存在于 merged_dict 中，则创建一个新列表
-                if k not in exchange_dictionary:
-                    exchange_dictionary[k] = []
-                # 将当前字典的值添加到合并字典中对应的键
-                exchange_dictionary[k].extend(v)
-        # 1-3 receive samples
-        # print(exchange_dictionary)
-        for i in range(robo_num):
-            if i in exchange_dictionary:
-                Robots[i].receive_samples(exchange_dictionary[i])
+        if True:
+            # 1-1 find the neighbours of each robot
+            robot_locations.clear()
+            for i in range(robo_num):
+                robot_locations.append(Robots[i].get_trajectory()[-1])
+            neighbour_list = voronoi_neighbours(robot_locations)
+            # 1-2 update voronoi cell info to each agents and exchange samples 
+            exchange_dictionary_X = {}
+            exchange_dictionary_y = {}
+            
+            for i in range(robo_num):
+                temp_dictionary_X, temp_dictionary_y = Robots[i].voronoi_update(neighbour_list[i], robot_locations)
+                for k, v in temp_dictionary_X.items():
+                    # 如果键还不存在于 merged_dict 中，则创建一个新列表
+                    if k not in exchange_dictionary_X:
+                        exchange_dictionary_X[k] = []
+                    # 将当前字典的值添加到合并字典中对应的键
+                    exchange_dictionary_X[k].extend(v)
+                    
+                for k, v in temp_dictionary_y.items():
+                    # 如果键还不存在于 merged_dict 中，则创建一个新列表
+                    if k not in exchange_dictionary_y:
+                        exchange_dictionary_y[k] = []
+                    # 将当前字典的值添加到合并字典中对应的键
+                    exchange_dictionary_y[k].extend(v)
+            # 1-3 receive samples
+            # print(exchange_dictionary)
+            for i in range(robo_num):
+                if i in exchange_dictionary_X:
+                    Robots[i].receive_samples(exchange_dictionary_X[i], exchange_dictionary_y[i])
         
         ## 2 communication ck and phi_k and consensus
-        ck_pack = {}
-        for i in range(robo_num):
-            ck_pack[i] = Robots[i].send_out_ck()
-        for i in range(robo_num):
-            Robots[i].receive_ck_consensus(ck_pack.copy()) 
+        if True:
+            ck_pack = {}
+            phik_pack = {}
+            for i in range(robo_num):
+                ck_pack[i] = Robots[i].send_out_ck()
+            for i in range(robo_num):
+                Robots[i].receive_ck_consensus(ck_pack.copy()) 
+            
             
         ## 3. doing estimation based on the gp model trained in the last round
         μ_test, σ_test = gp.predict(X_test, return_std=True)
@@ -149,7 +162,7 @@ def main():
 
 # Visualize
         SHOWN = True
-        if (iteration >= 15 and iteration % 3 == 0 and SHOWN):
+        if (iteration >= 20 and iteration % 3 == 0 and SHOWN):
             sizes = 5  # 可以是一个数字或者一个长度为N的数组，表示每个点的大小              
             # # 设置图表的总大小
 
