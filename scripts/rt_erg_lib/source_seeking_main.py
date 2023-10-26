@@ -1,5 +1,5 @@
 import numpy as np
-np.random.seed(10)
+np.random.seed(1)
 
 from matplotlib import pyplot as plt
 import matplotlib.gridspec as gridspec
@@ -14,11 +14,10 @@ from utils import find_peak
 
 from vonoroi_utils import voronoi_neighbours
 ## Initilize environment
-from scipy.stats import multivariate_normal
 
 from scipy.spatial import Voronoi, voronoi_plot_2d
-import threading
-
+from environment_and_measurement import f, sampling, source, source_value # sampling function is just f with noise
+                                                                        # while source and source_value are variables
 
 import rospy
 
@@ -28,23 +27,10 @@ COLORS = ['blue', 'green', 'red', 'purple', 'orange', 'black']  # 你可以添�
 def main():
         
     ## Define the source field
-    if True:
-        FIELD_SIZE_X = 10
-        FIELD_SIZE_Y = 10
-
-        source = np.array([[1,6], [8,7],[8,2], [5,6], [3,2]])
-        source1 = multivariate_normal(source[0], 0.8*np.eye(2))
-        source2 = multivariate_normal(source[1], np.eye(2))
-        source3 = multivariate_normal(source[2], np.eye(2))
-        source4 = multivariate_normal(source[3], np.eye(2))
-        source5 = multivariate_normal(source[4], np.eye(2))
-        
-
-        f = lambda x: source1.pdf(x) + 1.1*source2.pdf(x) + source3.pdf(x) + 0.9*source4.pdf(x) + source5.pdf(x)
-        source_value = f(source)
-
-        x_min = (0, 0)
-        x_max = (0+FIELD_SIZE_X, 0+FIELD_SIZE_Y)
+    FIELD_SIZE_X = 10
+    FIELD_SIZE_Y = 10
+    x_min = (0, 0)
+    x_max = (0+FIELD_SIZE_X, 0+FIELD_SIZE_Y)
 
     ## Initialize GP (uni-GP)
     if True:
@@ -61,13 +47,6 @@ def main():
             n_restarts_optimizer=10
         )
 
-    ## Define measurement 
-    if True:
-        # Define measurement noise model
-        σ_noise = 0.001
-        def measure(X_trains):
-            return f(X_trains) + np.random.normal(0, σ_noise, size=(X_trains.shape[0],))
-
     ## 用于采样的参数
     if True:
         # Predict points at uniform spacing to capture function
@@ -83,12 +62,10 @@ def main():
         robo_num = 3
         robot_locations = [[3,3], [5, 4], [7,3]]
         Robots = []
-        trajectory = []
         for index in range(robo_num):
             # initialize the thread
             instance = Controller(start_position=robot_locations[index], index=index, resolution=[50,50], field_size=[10,10]) # resolution is 50 * 50
             Robots.append(instance)
-            trajectory.append(np.empty((0,2)))
 
     ## Give Robots Prior knowledge (all the same)
     if True:
@@ -101,13 +78,12 @@ def main():
         else:
             X_train = np.array(robot_locations)
 
-        y_train = f(X_train) + np.random.normal(0, σ_noise, size=(1,))
-        print(y_train)
+        y_train = f(X_train) + np.random.normal(0, 0.001, size=(1,))
         gp.fit(X_train, y_train)
 
     rospy.init_node('main_function', anonymous=True)
 
-    
+    ## start source seeking!
     for iteration in range(100):
         
         if rospy.is_shutdown():
@@ -115,25 +91,36 @@ def main():
         
         print(iteration)
         
-        # 0-1 vonoroi tessellation
-        # get neighbours
+        ## 1 update vonoroi tessellation
+        # 1-1 find the neighbours of each robot
         robot_locations.clear()
         for i in range(robo_num):
-            robot_locations.append(Robots[i].get_location())
+            robot_locations.append(Robots[i].get_trajectory()[-1])
         neighbour_list = voronoi_neighbours(robot_locations)
-        # update voronoi cell info in each agents 
+        # 1-2 update voronoi cell info to each agents and exchange samples 
+        exchange_dictionary = {}
         for i in range(robo_num):
-            Robots[i].voronoi_update(neighbour_list[i], robot_locations)
+            temp_dictionary = Robots[i].voronoi_update(neighbour_list[i], robot_locations)
+            for k, v in temp_dictionary.items():
+                # 如果键还不存在于 merged_dict 中，则创建一个新列表
+                if k not in exchange_dictionary:
+                    exchange_dictionary[k] = []
+                # 将当前字典的值添加到合并字典中对应的键
+                exchange_dictionary[k].extend(v)
+        # 1-3 receive samples
+        # print(exchange_dictionary)
+        for i in range(robo_num):
+            if i in exchange_dictionary:
+                Robots[i].receive_samples(exchange_dictionary[i])
         
-        # 0-2 communication and consensus
+        ## 2 communication ck and phi_k and consensus
         ck_pack = {}
         for i in range(robo_num):
             ck_pack[i] = Robots[i].send_out_ck()
-
         for i in range(robo_num):
             Robots[i].receive_ck_consensus(ck_pack.copy()) 
             
-        # 1. doing estimation based on the gp model trained in the last round
+        ## 3. doing estimation based on the gp model trained in the last round
         μ_test, σ_test = gp.predict(X_test, return_std=True)
         μ_test_2D = μ_test.reshape(test_resolution)
         σ_test_2D = σ_test.reshape(test_resolution)
@@ -144,26 +131,25 @@ def main():
             LCB = μ_test_2D[peak[0]][peak[1]] - 2*σ_test_2D[peak[0]][peak[1]]
             LCB_list.append(LCB)
         
-        # 2. UCB!
+        ## 4. UCB!
         phi_vals = μ_test + 0.5*σ_test
         phi_vals_2D = phi_vals.reshape(test_resolution)
         
-        # 3. Move!
+        ## 5. Move and taking samples!
         for i in range(robo_num):
             setpts = Robots[i].get_nextpts(phi_vals)
-            trajectory[i] = np.concatenate((trajectory[i], setpts), axis=0) 
         
             # 4. Take samples and add to dataset
-            measurements = measure(setpts) 
+            measurements = sampling(setpts) 
             X_train = np.concatenate((X_train, setpts), axis=0)
             y_train = np.concatenate((y_train, measurements), axis=0)
             
-        # 4. train!
+        ## 6. train!
         gp.fit(X_train, y_train)
 
 # Visualize
         SHOWN = True
-        if (iteration >= 0 and iteration % 10 == 0 and SHOWN):
+        if (iteration >= 15 and iteration % 3 == 0 and SHOWN):
             sizes = 5  # 可以是一个数字或者一个长度为N的数组，表示每个点的大小              
             # # 设置图表的总大小
 
@@ -185,9 +171,11 @@ def main():
             # trajectory
             for i in range(robo_num):
                 color = COLORS[i % len(COLORS)]
-                axs[0].plot(trajectory[i][:, 0], trajectory[i][:, 1], color=color, zorder=1)  # 设置线条颜色
-                axs[0].scatter(trajectory[i][:, 0], trajectory[i][:, 1],s=sizes, c=color, zorder=2)
-            
+                trajectory = np.array(Robots[i].trajectory)
+                axs[0].plot(trajectory[:, 0], trajectory[:, 1], color=color, zorder=1)  # 设置线条颜色
+                axs[0].scatter(trajectory[:, 0], trajectory[:, 1],s=sizes, c=color, zorder=2)
+            axs[0].scatter(Robots[1].samples_X[:, 0], Robots[1].samples_X[:, 1], s=sizes, color='orange', zorder=3)
+            # print(Robots[0].samples_X)
             # sources ground truth
             if (True):
                 x_coords = source[:, 0]
