@@ -16,10 +16,19 @@ from grid_map_msgs.msg import GridMap
 from source_seeking.msg import Ck
 from environment_and_measurement import f, sampling, source, source_value # sampling function is just f with noise
 
+from sklearn.gaussian_process import GaussianProcessRegressor
+from sklearn.gaussian_process.kernels import RBF, WhiteKernel
+
+def kernel_initial(
+            σf_initial=1.0,         # covariance amplitude
+            ell_initial=1.0,        # length scale
+            σn_initial=0.1          # noise level
+        ):
+            return σf_initial**2 * RBF(length_scale=ell_initial, length_scale_bounds=(0.5, 2)) + WhiteKernel(noise_level=σn_initial)
 
 class Controller(object): # python (x,y) therefore col index first, row next
     # robot state + controller !
-    def __init__(self, start_position, index, resolution = [50,50], field_size = [10,10]):
+    def __init__(self, start_position, index, test_resolution = [50,50], field_size = [10,10]):
         
         ## robot index
         self.index = index
@@ -43,14 +52,19 @@ class Controller(object): # python (x,y) therefore col index first, row next
             # self._ck_dict   = {}
         
         ## field information
-        # resolution
-        self.row = resolution[0] # 50
-        self.col = resolution[1]
+        # test_resolution
+        self.test_resolution = test_resolution # [50, 50]
         # real size
         self.field_row = field_size[0] # 10
         self.field_col = field_size[1]
-        grid_2_r_w = np.meshgrid(np.linspace(0, 1, int(self.row)), np.linspace(0, 1, int(self.col)))
-        self.grid = np.c_[grid_2_r_w[0].ravel(), grid_2_r_w[1].ravel()]
+        
+        grid_2_r_w = np.meshgrid(np.linspace(0, 1, int(test_resolution[0])), np.linspace(0, 1, int(test_resolution[1])))
+        self.grid = np.c_[grid_2_r_w[0].ravel(), grid_2_r_w[1].ravel()] #(2500,2)
+      
+        X_test_x = np.linspace(0, field_size[0], test_resolution[0])
+        X_test_y = np.linspace(0, field_size[1], test_resolution[1])
+        X_test_xx, X_test_yy = np.meshgrid(X_test_x, X_test_y)
+        self.X_test = np.vstack(np.dstack((X_test_xx, X_test_yy))) #(50,50)
         
         ## ROBOT information
         # robot dynamics
@@ -69,10 +83,25 @@ class Controller(object): # python (x,y) therefore col index first, row next
         
         ## ROBOT neigibours
         self.neighbour = None  
-        self.responsible_region = np.zeros((self.row, self.col))
+        self.responsible_region = np.zeros(self.test_resolution)
+        
         print("Controller Succcessfully Initialized! Initial position is: ", start_position)
         self.sent_samples = []
+        
+        ## GP
+        self.gp = GaussianProcessRegressor(
+            kernel=kernel_initial(),
+            n_restarts_optimizer=10
+        )
+        self.estimation = None
+        self.ucb = None
     
+    def receive_prior_knowledge(self, X_train=None, y_train=None):
+        if X_train is not None:
+            assert X_train.shape[0] == y_train.shape[0], "Error: The number of elements in X_train and y_train must be equal."
+            self.samples_X = np.concatenate((self.samples_X, X_train), axis=0)
+            self.samples_Y = np.concatenate((self.samples_Y, y_train), axis=0)
+            
     # step 1 (update neighbour postions + know responsible region + exchange samples)
     def voronoi_update(self, neighour_robot_index, robots_locations): # set responsible region and neighbours
         # 1) update neighbour postions
@@ -80,15 +109,16 @@ class Controller(object): # python (x,y) therefore col index first, row next
         
         # 2) know responsible region
         # 采样精度是50*50，机器人实际的坐标是10*10
-        scale_row = self.row/self.field_row  
-        scale_col = self.col/self.field_col
+        
+        scale_row = self.test_resolution[0]/self.field_row  
+        scale_col = self.test_resolution[1]/self.field_col
         
         robots_locations = np.array(robots_locations)
         robots_locations_scaled = np.zeros_like(robots_locations)  # 创建一个与 robots 形状相同的全零数组
         robots_locations_scaled[:, 0] = robots_locations[:, 0] * scale_col  # 将第一列（X坐标）乘以10
         robots_locations_scaled[:, 1] = robots_locations[:, 1] * scale_row  # 将第二列（Y坐标）乘以20
         
-        grid_points = np.array([(x, y) for x in range(self.row) for y in range(self.col)])
+        grid_points = np.array([(x, y) for x in range(self.test_resolution[0]) for y in range(self.test_resolution[1])])
 
         # 计算每个格点到所有机器人的距离
         distances = cdist(grid_points, robots_locations_scaled, metric='euclidean')
@@ -97,6 +127,8 @@ class Controller(object): # python (x,y) therefore col index first, row next
         closest_robot = np.argmin(distances, axis=1)
 
         # 标记距离 [0,0] 机器人最近的格点为 1
+        self.responsible_region = np.zeros(self.test_resolution)
+        
         for i, robot_index in enumerate(closest_robot):
             if robot_index == self.index:
                 y, x = grid_points[i]
@@ -132,40 +164,60 @@ class Controller(object): # python (x,y) therefore col index first, row next
         if exchanged_samples_X is not None:
             self.samples_X = np.concatenate((self.samples_X, exchanged_samples_X), axis=0)
             self.samples_Y = np.concatenate((self.samples_Y, exchanged_samples_y), axis=0)
-   
-    # step 2
-    def gp_regresssion(self, samples, sample_values): # return the partial distribution
-        # if (len(samples) != 0):
-        #     self.samples = np.concatenate((self.samples, samples), axis=0)
-        # else:
-            
-        # if (n_train):
-        #     # Sample noisy observations (X1, y1) from the function for each of the GP components
-        #     X_train = np.random.uniform(x_min, x_max, size=(n_train, 2))
-        # else:
-        #     X_train = np.array(robot_locations)
-
-        # y_train = f(X_train) + np.random.normal(0, σ_noise, size=(1,))
-        # print(y_train)
-        # gp.fit(X_train, y_train)
-        return
+    
+    # step 2 calcualte GP
+    def gp_regresssion(self, ucb_coeff=0.5): # the X_train, y_train is only for the prior knowledge
+        # # 找到 samples_X 中重复元素的索引
+        # 根据这些索引保留 samples_X 和 samples_Y 中的非重复元素
+        _, unique_indices = np.unique(self.samples_X, axis=0, return_index=True)
+        self.samples_X = self.samples_X[unique_indices]
+        self.samples_Y = self.samples_Y[unique_indices]      
+        self.gp.fit(self.samples_X, self.samples_Y)
+        μ_test, σ_test = self.gp.predict(self.X_test, return_std=True)
+        ucb = μ_test + ucb_coeff*σ_test
         
+        self.estimation = μ_test.reshape(self.test_resolution)*self.responsible_region
+        # plt.imshow(self.estimation, cmap='viridis')
+        # plt.show()
+        
+        ucb = ucb.reshape(self.test_resolution)
+        
+        # plt.imshow(ucb, cmap='viridis')
+        # cbar = plt.colorbar()
+        # cbar.set_label('Value')
+        # plt.show()
+        
+        self.phik = convert_phi2phik(self.Erg_ctrl.basis, ucb, self.grid)
+        phi = convert_phik2phi(self.Erg_ctrl.basis, self.phik , self.grid)
+       
+        # plt.imshow(phi.reshape(50,50), cmap='viridis')
+        # cbar = plt.colorbar()
+        # cbar.set_label('Value')
+        # plt.show()
+        # self.Erg_ctrl.phik = convert_phi2phik(self.Erg_ctrl.basis, phi_vals, self.grid)
+        return self.estimation, ucb
+        # return μ_test, σ_test
+    
+    # step 3 exchange phik ck 
     def send_out_phik(self):
-        ck = self.Erg_ctrl.get_ck()
-        if ck is not None:
-            return ck 
+        if self.phik is not None:
+            return self.phik
     
-    def receive_phik_consensus(self, ck_pack):
-        my_ck = self.Erg_ctrl.get_ck()
-        if my_ck is not None:
-            cks = [my_ck]
+    def receive_phik_consensus(self, phik_pack):
+        phik = [self.phik]
+        if self.phik is not None:
             for neighbour_index in self.neighbour:
-                cks.append(ck_pack[neighbour_index])
-            ck_mean = np.mean(cks, axis=0)
-            self.Erg_ctrl.receieve_consensus_ck(ck_mean)
-    
-    
-   
+                phik.append(phik_pack[neighbour_index])
+            phik_consensus = np.mean(phik, axis=0)
+            self.Erg_ctrl.phik = 0.0025*phik_consensus
+        phi = convert_phik2phi(self.Erg_ctrl.basis, phik_consensus , self.grid)
+        # plt.imshow(phi.reshape(50,50), cmap='viridis')
+        # cbar = plt.colorbar()
+        # cbar.set_label('Value')
+        # plt.show()   
+
+        return phi.reshape(self.test_resolution)
+        
     def send_out_ck(self):
         ck = self.Erg_ctrl.get_ck()
         if ck is not None:
@@ -180,18 +232,26 @@ class Controller(object): # python (x,y) therefore col index first, row next
             ck_mean = np.mean(cks, axis=0)
             self.Erg_ctrl.receieve_consensus_ck(ck_mean)
         
-    
-    def get_nextpts(self, phi_vals): 
+    # step 4 move will ergodic control
+    def get_nextpts(self, uniform=False, phi_vals=None):
+
         sample_steps = 1
         setpoints = []
-        
-        # setting the phik on the ergodic controller
-        phi_vals = np.array(phi_vals)
-        phi_vals /= np.sum(phi_vals)
+        if uniform: 
+            # setting the phik on the ergodic controller    
+            phi_vals = np.ones(self.test_resolution)
+            phi_vals /= np.sum(phi_vals)
 
-        self.Erg_ctrl.phik = convert_phi2phik(self.Erg_ctrl.basis, phi_vals, self.grid)
+            self.Erg_ctrl.phik = convert_phi2phik(self.Erg_ctrl.basis, phi_vals, self.grid)
         
+        if phi_vals is not None:
+            phi_vals = np.ones(self.test_resolution)
+            phi_vals /= np.sum(phi_vals)
+
+            self.Erg_ctrl.phik = convert_phi2phik(self.Erg_ctrl.basis, phi_vals, self.grid)
+           
         i = 0
+        print(np.mean(self.Erg_ctrl.phik))
         while (i < sample_steps):
             i += 1
             ctrl = self.Erg_ctrl(self.robot_state)
@@ -207,6 +267,7 @@ class Controller(object): # python (x,y) therefore col index first, row next
         
         return setpoints
     
+    # Tools
     def get_trajectory(self):
         # return [self.field_row*self.robot_state[0], self.field_col*self.robot_state[1]]
         return self.trajectory
