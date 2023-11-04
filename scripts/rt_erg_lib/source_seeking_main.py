@@ -10,10 +10,11 @@ import matplotlib.gridspec as gridspec
 # from rt_erg_lib.controller import Controller
 # from rt_erg_lib.utils import find_peak
 from controller import Controller
-from utils import find_peak
+from utils import find_peak, calculate_wrmse
 
 from vonoroi_utils import voronoi_neighbours
 ## Initilize environment
+from IPython.display import clear_output
 
 from scipy.spatial import Voronoi, voronoi_plot_2d
 from environment_and_measurement import f, sampling, source, source_value # sampling function is just f with noise
@@ -79,7 +80,10 @@ def main():
             instance.receive_prior_knowledge(X_train, y_train)
             Robots.append(instance)
 
-    
+    plt.ion()  # 开启interactive mode
+    fig, ax = plt.subplots()
+    rmse_values = []
+
     ## start source seeking!
     for iteration in range(100):
         
@@ -172,8 +176,7 @@ def main():
                 ucb_changed = Robots[i].receive_phik_consensus(phik_pack.copy()) 
             else:
                 Robots[i].receive_phik_consensus(phik_pack.copy()) 
-        
-        
+
         
         ## 4. Move and taking samples!
         for i in range(robo_num):
@@ -190,9 +193,44 @@ def main():
             # y_train = np.concatenate((y_train, measurements), axis=0)
             
         
+    ####################################################################
+    ## Visualize
+        SHOWN = False
+        RMS_SHOW = False
+        WRMSE = 1
+        if RMS_SHOW:
+            if WRMSE:
+                rmse = calculate_wrmse(μ_estimation, f(X_test).reshape(test_resolution))
+                rmse_values.append(rmse)
+                print(rmse)
+                # 更新图表
+                ax.clear()  # 清除旧的线条
+                ax.plot(rmse_values)  # 绘制新的线条
+                ax.set_title('WRMSE over iterations')
+                ax.set_xlabel('Iteration')
+                ax.set_ylabel('WRMSE')
 
-    # Visualize
-        SHOWN = True
+                # 重绘图表
+                fig.canvas.draw()
+                fig.canvas.flush_events()
+                clear_output(wait=True)  # 清除输出并显示新图
+                
+            else:
+                rmse = np.sqrt(np.mean((μ_estimation - f(X_test).reshape(test_resolution)) ** 2))
+                rmse_values.append(rmse)
+                print(rmse)
+                # 更新图表
+                ax.clear()  # 清除旧的线条
+                ax.plot(rmse_values)  # 绘制新的线条
+                ax.set_title('RMSE over iterations')
+                ax.set_xlabel('Iteration')
+                ax.set_ylabel('RMSE')
+
+                # 重绘图表
+                fig.canvas.draw()
+                fig.canvas.flush_events()
+                clear_output(wait=True)  # 清除输出并显示新图
+        
         if (iteration > 0 and iteration % 10 == 0 and SHOWN):
             sizes = 5  # 可以是一个数字或者一个长度为N的数组，表示每个点的大小              
             # # 设置图表的总大小

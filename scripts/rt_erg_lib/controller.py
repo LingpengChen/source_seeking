@@ -251,7 +251,7 @@ class Controller(object): # python (x,y) therefore col index first, row next
             self.Erg_ctrl.phik = convert_phi2phik(self.Erg_ctrl.basis, phi_vals, self.grid)
            
         i = 0
-        print(np.mean(self.Erg_ctrl.phik))
+        # print(np.mean(self.Erg_ctrl.phik))
         while (i < sample_steps):
             i += 1
             ctrl = self.Erg_ctrl(self.robot_state)

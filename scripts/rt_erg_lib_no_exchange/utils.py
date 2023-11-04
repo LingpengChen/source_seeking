@@ -13,8 +13,9 @@ def convert_phi2phik(basis, phi_val, phi_grid=None):
                                 for _ in range(2)])
 
     assert phi_grid.shape[0] == phi_val.shape[0], 'samples are not the same'
-
+    # res = 1/phi_val.shape[0] * np.sum([basis.fk(x) * v for v, x in zip(phi_val, phi_grid)], axis=0)
     res = np.sum([basis.fk(x) * v for v, x in zip(phi_val, phi_grid)], axis=0)
+    
     return res
 
 def convert_phik2phi(basis, phik, phi_grid=None):
@@ -36,7 +37,7 @@ def convert_traj2ck(basis, xt):
     '''
     # function (3)  xt are path points
     N = len(xt)
-    return np.sum([basis.fk(x) for x in xt], axis=0) / N
+    return 1/2500*np.sum([basis.fk(x) for x in xt], axis=0) / N
 
 def convert_ck2dist(basis, ck, grid=None):
     '''

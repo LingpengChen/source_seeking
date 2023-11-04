@@ -5,14 +5,14 @@ import numpy as np
 FIELD_SIZE_X = 10
 FIELD_SIZE_Y = 10
 
-source = np.array([[1,6], [8,7],[8,2], [5,6], [3,2]])
+source = np.array([[2,6], [8,7],[8,2], [5,6], [3,2]])
 source1 = multivariate_normal(source[0], 0.8*np.eye(2))
-source2 = multivariate_normal(source[1], np.eye(2))
-source3 = multivariate_normal(source[2], np.eye(2))
+source2 = multivariate_normal(source[1], 0.9*np.eye(2))
+source3 = multivariate_normal(source[2], 0.85*np.eye(2))
 source4 = multivariate_normal(source[3], np.eye(2))
-source5 = multivariate_normal(source[4], np.eye(2))
+source5 = multivariate_normal(source[4], 0.9*np.eye(2))
 
-f = lambda x: source1.pdf(x) + 1.1*source2.pdf(x) + source3.pdf(x) + 0.9*source4.pdf(x) + source5.pdf(x)
+f = lambda x: source1.pdf(x) + 1.05*source2.pdf(x) + source3.pdf(x) + 0.95*source4.pdf(x) + source5.pdf(x)
 source_value = f(source)
 
 def sampling(x):
