@@ -255,6 +255,7 @@ class Controller(object): # python (x,y) therefore col index first, row next
         while (i < sample_steps):
             i += 1
             ctrl = self.Erg_ctrl(self.robot_state)
+            print(self.robot_state)
             self.robot_state = self.robot_dynamic.step(ctrl)
                   
             setpoints.append([ self.field_row*self.robot_state[0], self.field_col*self.robot_state[1] ])

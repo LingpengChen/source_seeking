@@ -16,8 +16,8 @@ class DoubleIntegratorLQR(DoubleIntegrator):
     def __init__(self):
         super().__init__()
         # 定义Q和R权重矩阵
-        self.Q = np.diag([10, 10, 1, 1])
-        self.R = np.diag([1, 1])
+        self.Q = np.diag([0.1, 0.1, 0, 0])
+        self.R = np.diag([0.001, 0.001])
         self.K = lqr_gain(self.A, self.B, self.Q, self.R)
 
     def control(self, x_desired, x_current):
@@ -32,13 +32,16 @@ class DoubleIntegratorLQR(DoubleIntegrator):
 robot = DoubleIntegratorLQR()
 x0 = np.array([0, 0, 10, 0])
 robot.reset(x0)
-x_desired = np.array([10, 10, 0, 0])
+x_desired = np.array([1, 1, 0, 0])
 
-N = 200  # Number of steps
+N = 10  # Number of steps
 trajectory = [x0]
 for _ in range(N):
     u = robot.control(x_desired, robot.state)
     x_next = robot.step(u)
+    delta = x_next[:2] - x_desired[:2]
+    if np.sqrt(np.dot(delta, delta)) < 0.01:
+        break
     print(u)
     trajectory.append(x_next)
 
@@ -47,7 +50,7 @@ import matplotlib.pyplot as plt
 
 trajectory = np.array(trajectory)
 plt.scatter(trajectory[:, 0], trajectory[:, 1], label='Robot Path', s=10, c='blue')
-plt.scatter([10], [10], color='red', marker='*', label='Target')
+plt.scatter([3], [3], color='red', marker='*', label='Target')
 plt.xlabel('X Position')
 plt.ylabel('Y Position')
 plt.legend()

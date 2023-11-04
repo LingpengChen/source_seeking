@@ -80,8 +80,7 @@ def main():
             instance.receive_prior_knowledge(X_train, y_train)
             Robots.append(instance)
 
-    plt.ion()  # 开启interactive mode
-    fig, ax = plt.subplots()
+    
     rmse_values = []
 
     ## start source seeking!
@@ -195,10 +194,12 @@ def main():
         
     ####################################################################
     ## Visualize
-        SHOWN = False
+        SHOWN = True
         RMS_SHOW = False
         WRMSE = 1
         if RMS_SHOW:
+            plt.ion()  # 开启interactive mode
+            fig, ax = plt.subplots()
             if WRMSE:
                 rmse = calculate_wrmse(μ_estimation, f(X_test).reshape(test_resolution))
                 rmse_values.append(rmse)
