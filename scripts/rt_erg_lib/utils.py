@@ -54,25 +54,31 @@ def convert_ck2dist(basis, ck, grid=None):
 
 from scipy.ndimage import maximum_filter
 
-def find_peak(matrix):
+def find_peak(matrix, strict=True):
     
     # 使用最大滤波器找到每个位置的局部最大值
-    local_max = maximum_filter(matrix, size=3) == matrix
+    local_max = maximum_filter(matrix, size=3) == matrix # [[F F][T F]]
     
     # 获取局部最大值的坐标
     local_maxima_coords = np.argwhere(local_max)
     
-    # 过滤出严格大于其周围邻居的局部最大值
-    strict_local_maxima = []
-    for i, j in local_maxima_coords:
-        if i > 0 and j > 0 and i < matrix.shape[0] - 1 and j < matrix.shape[1] - 1:
-            neighbors = [matrix[i-1, j-1], matrix[i-1, j], matrix[i-1, j+1],
-                         matrix[i, j-1],                 matrix[i, j+1],
-                         matrix[i+1, j-1], matrix[i+1, j], matrix[i+1, j+1]]
-            if all(matrix[i, j] > neighbor for neighbor in neighbors):
-                strict_local_maxima.append((i,j))
-    
-    return strict_local_maxima
+    if strict:
+        # 过滤出严格大于其周围邻居的局部最大值
+        strict_local_maxima = []
+        for i, j in local_maxima_coords:
+            if i > 0 and j > 0 and i < matrix.shape[0] - 1 and j < matrix.shape[1] - 1:
+                neighbors = [matrix[i-1, j-1], matrix[i-1, j], matrix[i-1, j+1],
+                            matrix[i, j-1],                 matrix[i, j+1],
+                            matrix[i+1, j-1], matrix[i+1, j], matrix[i+1, j+1]]
+                if all(matrix[i, j] > neighbor for neighbor in neighbors):
+                    strict_local_maxima.append([i,j])
+        if (len(strict_local_maxima)):
+            return np.array(strict_local_maxima)[:, [1, 0]]
+        else:
+            return strict_local_maxima
+
+    else:
+        return local_maxima_coords[:, [1, 0]]
 
 def calculate_wrmse(mu, mu_gt):
     # Element-wise absolute difference between prediction and ground truth

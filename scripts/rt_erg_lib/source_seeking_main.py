@@ -6,11 +6,10 @@ import matplotlib.gridspec as gridspec
 
 # from sklearn.gaussian_process import GaussianProcessRegressor
 # from sklearn.gaussian_process.kernels import RBF, WhiteKernel
-
 # from rt_erg_lib.controller import Controller
-# from rt_erg_lib.utils import find_peak
-from controller import Controller
+
 from utils import find_peak, calculate_wrmse
+from controller import Controller
 
 from vonoroi_utils import voronoi_neighbours
 ## Initilize environment
@@ -129,7 +128,9 @@ def main():
             μ_partial, ucb_partial = Robots[i].gp_regresssion(ucb_coeff=2)
             μ_estimation += μ_partial
             ucb += ucb_partial
-        
+            sources, lcb = Robots[i].get_estimated_source()
+            # print(sources, lcb)
+        # ucb miu estimation
         if 0:
             x = np.linspace(0, 49, 50)
             y = np.linspace(0, 49, 50)
@@ -151,11 +152,7 @@ def main():
         # μ_test, σ_test = gp.predict(X_test, return_std=True)
         # μ_test_2D = μ_test.reshape(test_resolution)
         # σ_test_2D = σ_test.reshape(test_resolution)
-        # # peaks = find_peak(μ_test_2D) 
-        # LCB_list = []
-        # for peak in peaks:
-        #     LCB = μ_test_2D[peak[0]][peak[1]] - 2*σ_test_2D[peak[0]][peak[1]]
-        #     LCB_list.append(LCB)
+        
         # # UCB!
         # phi_vals = μ_test + 0.5*σ_test
         # phi_vals_2D = phi_vals.reshape(test_resolution)
