@@ -22,8 +22,8 @@ class DoubleIntegrator(object):
         self.dt = 0.1
 
         self.A = np.array([
-                [0., 0., 1.0-0.2, 0.],
-                [0., 0., 0., 1.0-0.2],
+                [0., 0., 1.0, 0.],
+                [0., 0., 0., 1.0],
                 [0., 0., 0., 0.],
                 [0., 0., 0., 0.]
         ])# - np.diag([0,0,1,1]) * 0.25
@@ -75,3 +75,4 @@ class DoubleIntegrator(object):
         # TODO: include ctrl clip
         self.state = self.state + self.f(self.state, a) * self.dt
         return self.state.copy()
+

@@ -55,6 +55,10 @@ class RTErgodicControl(object):
     def receieve_consensus_ck(self, ck):
         self._consensus_ck = ck
 
+    def update_trajectory(self, state):
+        self.replay_buffer.push(state[self.model.explr_idx])
+        
+    
     def __call__(self, state):
         assert self.phik is not None, 'Forgot to set phik, use set_target_phik method'
 

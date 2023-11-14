@@ -1,16 +1,9 @@
-import numpy as np
+my_list = [[3, 3], [5, 6], [3, 3]]
 
-def distance(point1, point2):
-    # 将两个点转换为NumPy数组以确保正确的数学操作
-    point1 = np.array(point1)
-    point2 = np.array(point2)
-    # 计算两点间的差值
-    delta = point1 - point2
-    # 计算欧几里得距离
-    dist = np.sqrt(np.dot(delta, delta))
-    return dist
+# 将内部列表转换成元组
+tuple_list = [tuple(item) for item in my_list]
 
-# 示例用法
-p1 = [1, 2]
-p2 = [4, 5]
-print("Distance between p1 and p2:", distance(p1, p2))
+# 使用集合去除重复元素，并转换回列表
+unique_list = [list(item) for item in set(tuple_list)]
+
+print(unique_list)  # 输出: [[3, 3], [5, 6]] 或者 [[5, 6], [3, 3]]，取决于集合操作的结果

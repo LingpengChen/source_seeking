@@ -2,7 +2,6 @@ import sys
 # sys.path.append('./rt_erg_lib/')
 from double_integrator import DoubleIntegrator
 from ergodic_control import RTErgodicControl
-from mpc import MPCController
 from target_dist import TargetDist
 from scipy.spatial.distance import cdist
 from scipy.spatial import Voronoi, distance
@@ -15,7 +14,7 @@ from scipy.io import loadmat
 import rospy
 from grid_map_msgs.msg import GridMap
 from source_seeking.msg import Ck
-from environment_and_measurement import sampling, find_source, FOUND_SOURCE_THRESHOLD, LCB_THRESHOLD # sampling function is just f with noise
+from environment_and_measurement import f, sampling, source, source_value # sampling function is just f with noise
 
 from sklearn.gaussian_process import GaussianProcessRegressor
 from sklearn.gaussian_process.kernels import RBF, WhiteKernel
@@ -77,7 +76,7 @@ class Controller(object): # python (x,y) therefore col index first, row next
         self.robot_state[:2] = np.array([start_position[0]/self.field_size[0], start_position[1]/self.field_size[1]])
         self.robot_dynamic.reset(self.robot_state)
         self.Erg_ctrl    = RTErgodicControl(DoubleIntegrator(), weights=0.01, horizon=15, num_basis=10, batch_size=-1)
-        self.Mpc_ctrl    = MPCController(DoubleIntegrator(), horizon=10, Q=1, R=0.001)
+        self.Mpc_ctrl    = 
         # samples 
         self.samples_X = np.array([start_position])
         self.samples_Y = np.array(sampling([start_position]))
@@ -99,8 +98,7 @@ class Controller(object): # python (x,y) therefore col index first, row next
         self.estimation = None
         self.variance = None
         self.peaks_cord = None
-        self.peaks_LCB = None
-        self.visited_peaks_cord = []
+        self.peak_LCB = None
         ## 
     
     def receive_prior_knowledge(self, X_train=None, y_train=None):
@@ -204,7 +202,7 @@ class Controller(object): # python (x,y) therefore col index first, row next
         self.estimate_source(lcb_coeff=2)
         return self.estimation*self.responsible_region, ucb
     
-    # step 3 exchange phik ck visted source
+    # step 3 exchange phik ck 
     def send_out_phik(self):
         if self.phik is not None:
             return self.phik
@@ -233,77 +231,106 @@ class Controller(object): # python (x,y) therefore col index first, row next
                 cks.append(ck_pack[neighbour_index])
             ck_mean = np.mean(cks, axis=0)
             self.Erg_ctrl.receieve_consensus_ck(ck_mean)
-    
-    def send_out_source_cord(self):
-        return self.visited_peaks_cord
-    
-    def receive_source_cord(self, peaks):
-        self.visited_peaks_cord = peaks
         
     # step 4 move will ergodic control
     def get_nextpts(self, phi_vals=None, control_mode="ES_NORMAL"):
-        ctrl = None
+
+        sample_steps = 1
+        setpoints = []
+        
+        active_sensing = True
         target = None
-        active_sensing = True   
-        if control_mode == "ES_UNIFORM":
-            # setting the phik on the ergodic controller    
-            phi_vals = np.ones(self.test_resolution)
-            phi_vals /= np.sum(phi_vals)
-            self.Erg_ctrl.phik = convert_phi2phik(self.Erg_ctrl.basis, phi_vals, self.grid)
-            ctrl = self.Erg_ctrl(self.robot_state)
-           
-        elif control_mode == "ES_NORMAL":
-            if phi_vals is not None:
-                phi_vals /= np.sum(phi_vals)
-                self.Erg_ctrl.phik = convert_phi2phik(self.Erg_ctrl.basis, phi_vals, self.grid)
-
-            # determine whether to active sensing or source seeking
-            
-            
-            # remove the peak that has already been visited
-            indices_to_remove = []
-            for i, peak in enumerate(self.peaks_cord):
-                for visited_peak in self.visited_peaks_cord:
-                    if np.linalg.norm(np.array(peak) - np.array(visited_peak)) < 2*FOUND_SOURCE_THRESHOLD:
-                        indices_to_remove.append(i)
-                        break
-
-            peaks_cord = [peak for i, peak in enumerate(self.peaks_cord) if i not in indices_to_remove]
-            peaks_LCB = [lcb for i, lcb in enumerate(self.peaks_LCB) if i not in indices_to_remove]
-            
-            if peaks_LCB and np.max(peaks_LCB) > LCB_THRESHOLD:   # determine to seek which peak   
-                index = np.argmax(peaks_LCB)
-                distance = cdist([self.trajectory[-1]], [peaks_cord[index]])[0][0]
-                target = peaks_cord[index]
-                active_sensing = False
-
-            if active_sensing:
-                ctrl = self.Erg_ctrl(self.robot_state)
-                # print("ES: ", ctrl)
+        if control_mode!="ES_UNIFORM" and  self.peak_LCB and np.max(self.peak_LCB) > 0.1:      
+            index = np.argmax(self.peak_LCB)
+            distance = cdist([self.trajectory[-1]], [self.peaks_cord[index]])[0][0]
+            target = self.peaks_cord[index]
+            print("For robot ", self.index, "its target is ", self.peaks_cord[index], "distance = ", distance)
+            active_sensing = False
+        # for target_index in range(len(self.peak_LCB)):
+        #     if self.peak_LCB[target_index] > 0.15:
+        
+        if active_sensing:
+            if "ES" in control_mode:
+                if phi_vals is not None:
+                    phi_vals /= np.sum(phi_vals)
+                    self.Erg_ctrl.phik = convert_phi2phik(self.Erg_ctrl.basis, phi_vals, self.grid)
                 
-            else: # source seeking
-                self.Erg_ctrl.update_trajectory(self.robot_state)
-                ctrl_target = np.array(target) / self.field_size[0]
-                ctrl = self.Mpc_ctrl(self.robot_state, ctrl_target)
-                # print("mpc: ", ctrl, "with target: ", target)
-       
-        self.robot_state = self.robot_dynamic.step(ctrl)         
-        setpoint = [[ self.field_size[0]*self.robot_state[0], self.field_size[1]*self.robot_state[1] ]]
-       
-        self.trajectory = self.trajectory + setpoint
-        setpoint = np.array(setpoint)
-        
-        # determine whether the source is found
-        source_cord = find_source(setpoint, FOUND_SOURCE_THRESHOLD)
-        if not active_sensing and source_cord is not None:
-            print("source", source_cord, "is found by Robot ", self.index, "!", "The target is ", target)
-            self.visited_peaks_cord.append(list(source_cord))
+                if control_mode == "ES_NORMAL":
+                    print(self.peaks_cord, self.peak_LCB)
 
-        self.samples_X = np.concatenate((self.samples_X, setpoint), axis=0)
-        self.samples_Y = np.concatenate((self.samples_Y, sampling(setpoint)), axis=0)
+                if control_mode == "ES_UNIFORM":
+                    # setting the phik on the ergodic controller    
+                    phi_vals = np.ones(self.test_resolution)
+                    phi_vals /= np.sum(phi_vals)
+                    self.Erg_ctrl.phik = convert_phi2phik(self.Erg_ctrl.basis, phi_vals, self.grid)
+
+                i = 0
+                while (i < sample_steps):
+                    i += 1
+                    ctrl = self.Erg_ctrl(self.robot_state)
+                    self.robot_state = self.robot_dynamic.step(ctrl)         
+                    setpoints.append([ self.field_size[0]*self.robot_state[0], self.field_size[1]*self.robot_state[1] ])
+            
+            elif control_mode == "DUCB":
+                # 计算每个格点到所有机器人的距离
+                own_loc = self.trajectory[-1]
+                distances = cdist(self.X_test, [own_loc], metric='euclidean').reshape(self.test_resolution)
+                kapa = 20
+                ucb = self.estimation + kapa * self.variance
+                gama = -0.3
+                ducb = ucb + gama * distances
+
+                temp = (ducb+100)  * self.responsible_region
+                max_index_1d = np.argmax(temp)
+                # max_index_2d = np.unravel_index(max_index_1d, self.test_resolution)
+                target_pt = self.X_test[max_index_1d]
+                setpoints.append(target_pt)
+            
+            elif control_mode == "Boundry_setting":
+                own_loc = self.trajectory[-1]
+                distances = cdist(self.X_test, [own_loc], metric='euclidean').reshape(self.test_resolution)
+                distances[distances > 0.5] = 1
+                distances[distances <= 0.5] = 0
+                ucb = (self.estimation + 10 * self.variance) * self.responsible_region 
+                ucb_trun = ucb * (1-distances)
+                
+                max_index_1d = np.argmax(ucb_trun)
+                # max_index_2d = np.unravel_index(max_index_1d, self.test_resolution)
+                target_pt = self.X_test[max_index_1d]
+                setpoints.append(target_pt)
+                
+                # # 创建一个图和两个子图的轴
+                # fig, (ax1, ax2) = plt.subplots(1, 2)
+
+                # # 在第一个子图上显示图像
+                # im1 = ax1.imshow(ucb, cmap='viridis', origin='lower')
+                # ax1.scatter(5*np.array(setpoints)[:, 0], 5*np.array(setpoints)[:, 1],s=5, c='red', zorder=1)
+                # ax1.set_xlabel('X Label')  # 设置第一个子图的X轴标签
+                # ax1.set_title('UCB')  # 设置第一个子图的标题
+                # cbar1 = fig.colorbar(im1, ax=ax1)  # 在第一个子图上添加颜色条
+                # cbar1.set_label('Value')  # 设置第一个子图的颜色条标签
+
+                # # 在第二个子图上显示图像
+                # im2 = ax2.imshow(ucb_trun, cmap='viridis', origin='lower')
+                # ax2.set_xlabel('X Label')  # 设置第二个子图的X轴标签
+                # ax2.set_title('ucb_trun')  # 设置第二个子图的标题
+                # cbar2 = fig.colorbar(im2, ax=ax2)  # 在第二个子图上添加颜色条
+                # cbar2.set_label('Value')  # 设置第二个子图的颜色条标签
+                # plt.show()
+                
+            elif control_mode == "UCB_dynamic_model":
+                pass
         
+        # source seeking
+        else:
+            
+               
+        self.trajectory = self.trajectory + setpoints
+        setpoints = np.array(setpoints)
+        self.samples_X = np.concatenate((self.samples_X, setpoints), axis=0)
+        self.samples_Y = np.concatenate((self.samples_Y, sampling(setpoints)), axis=0)
         
-        return setpoint
+        return setpoints
     
     
     # Tools
@@ -318,7 +345,8 @@ class Controller(object): # python (x,y) therefore col index first, row next
         increased_resolution_ratio = self.test_resolution[0]/2 # 25
         real_res_ratio_new = real_res_ratio/increased_resolution_ratio
         X_test = self.X_test/increased_resolution_ratio # increase resolution of sampling point [[0,0.2]] => [[0,0.2/ratio]]
-        peaks_cord = [] # this is all peaks without filtering (over the whole field)
+        # new_ratio = [ratio[0]*(2/self.test_resolution[0]), ratio[1]*(2/self.test_resolution[1])]
+        peaks_cord = []
         for peak in peaks:
             x, y =  real_res_ratio * (peak[0]-1),  real_res_ratio * (peak[1]-1) # real coordinate (start from upper left)
             X_test_copy = np.copy(X_test)
@@ -330,8 +358,8 @@ class Controller(object): # python (x,y) therefore col index first, row next
             peak_x, peak_y = x + real_res_ratio_new*new_peaks[0], y + real_res_ratio_new*new_peaks[0]
             peaks_cord.append([peak_x, peak_y])
 
-        self.peaks_cord = [] # filter out the peaks out of the voronoi cell
-        self.peaks_LCB = []
+        self.peaks_cord = []
+        self.peak_LCB = []
         if len(peaks_cord):
             μ, σ = self.gp.predict(peaks_cord, return_std=True)
             own_loc = self.trajectory[-1]
@@ -344,13 +372,42 @@ class Controller(object): # python (x,y) therefore col index first, row next
             for peak in peaks_cord:
                 if closest_robot_index[i] == 0: 
                     LCB = μ[i] - lcb_coeff*σ[i]
-                    self.peaks_LCB.append(LCB)
+                    self.peak_LCB.append(LCB)
                     self.peaks_cord.append(peak)
                 i+=1
 
             
-        return self.peaks_cord, self.peaks_LCB
+        return self.peaks_cord, self.peak_LCB
     
     def get_estimated_source(self):
-        return self.peaks_cord, self.peaks_LCB 
+        return self.peaks_cord, self.peak_LCB 
     
+    # def _ck_link_callback(self, msg):
+    #     received_robo_index = int(msg.name)
+    #     if received_robo_index != self.index:
+    #         if received_robo_index in self.neighbour: # is neighbour (add or update)
+    #             # if received_robo_index in self._ck_dict: # update
+    #             # else if received_robo_index not in self._ck_dict: # not in dict 
+    #             self._ck_dict.update({received_robo_index : np.array(msg.ck)})
+    #         elif received_robo_index in self._ck_dict: # not neighour any more 
+    #             del self._ck_dict[received_robo_index]
+    
+    # def run(self):
+    #     # rospy.init_node(self.agent_name)
+    #     rate = rospy.Rate(10)
+    #     while not rospy.is_shutdown():
+    #         # self.step()
+    #         rate.sleep() 
+       # def _phik_link_callback(self, msg):
+    #     return
+    
+    # def ck_concensus(self):
+    #     my_ck = self.Erg_ctrl.get_ck()
+    #     if len(self._ck_dict.keys()) >= 1:
+    #         print("consensus!!!")
+    #         cks = [my_ck]
+    #         for key in self._ck_dict.keys():
+    #             cks.append(self._ck_dict[key])
+    #         ck_mean = np.mean(cks, axis=0)
+    #         self.Erg_ctrl.set_ck(ck_mean)
+    #         self._ck_msg.ck = ck_mean.copy()

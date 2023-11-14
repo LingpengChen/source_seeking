@@ -9,8 +9,8 @@ class DoubleIntegrator(object):
                                     np.array([1.0, 1.0, np.inf, np.inf]),
                                     dtype=np.float32)
 
-        self.action_space = Box(np.array([-1., -1.]),
-                                    np.array([1.0, 1.0]),
+        self.action_space = Box(np.array([-5., -5.]),
+                                    np.array([5.0, 5.0]),
                                     dtype=np.float32)
 
         self.explr_space = Box(np.array([0., 0.]),
