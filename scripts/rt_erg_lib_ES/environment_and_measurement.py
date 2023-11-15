@@ -2,8 +2,8 @@
 from scipy.stats import multivariate_normal
 import numpy as np
 
-FOUND_SOURCE_THRESHOLD = 0.25
-LCB_THRESHOLD = 0.11 # determine to seek which peak 
+FOUND_SOURCE_THRESHOLD = 0.25 # to distinguish whether this is one source or two source
+LCB_THRESHOLD = 0.1 # determine to seek which peak 
 FIELD_SIZE_X = 10
 FIELD_SIZE_Y = 10
 
@@ -11,7 +11,7 @@ SOURCE = np.array([[2,6], [8,7],[8,2], [5,6], [3,2]])
 source1 = multivariate_normal(SOURCE[0], 0.8*np.eye(2))
 source2 = multivariate_normal(SOURCE[1], 0.9*np.eye(2))
 source3 = multivariate_normal(SOURCE[2], 0.85*np.eye(2))
-source4 = multivariate_normal(SOURCE[3], 0.95*np.eye(2))
+source4 = multivariate_normal(SOURCE[3], 0.9*np.eye(2))
 source5 = multivariate_normal(SOURCE[4], 0.9*np.eye(2))
 
 f = lambda x: source1.pdf(x) + 1.05*source2.pdf(x) + source3.pdf(x) + 1.1*source4.pdf(x) + source5.pdf(x)

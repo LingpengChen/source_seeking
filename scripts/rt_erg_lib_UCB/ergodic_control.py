@@ -7,7 +7,7 @@ from source_seeking.msg import Ck
 class RTErgodicControl(object):
 
     def __init__(self, model,
-                    weights=0.2, horizon=100, num_basis=5,
+                    weights=0.1, horizon=100, num_basis=5,
                     capacity=100000, batch_size=100):
 
         self.model       = model
@@ -55,6 +55,10 @@ class RTErgodicControl(object):
     def receieve_consensus_ck(self, ck):
         self._consensus_ck = ck
 
+    def update_trajectory(self, state):
+        self.replay_buffer.push(state[self.model.explr_idx])
+        
+    
     def __call__(self, state):
         assert self.phik is not None, 'Forgot to set phik, use set_target_phik method'
 

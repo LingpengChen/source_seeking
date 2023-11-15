@@ -279,13 +279,13 @@ class Controller(object): # python (x,y) therefore col index first, row next
 
             if active_sensing:
                 ctrl = self.Erg_ctrl(self.robot_state)
-                # print("ES: ", ctrl)
+                print("ES: ", ctrl)
                 
             else: # source seeking
                 self.Erg_ctrl.update_trajectory(self.robot_state)
                 ctrl_target = np.array(target) / self.field_size[0]
                 ctrl = self.Mpc_ctrl(self.robot_state, ctrl_target)
-                # print("mpc: ", ctrl, "with target: ", target)
+                print("mpc: ", ctrl, "with target: ", target)
        
         self.robot_state = self.robot_dynamic.step(ctrl)         
         setpoint = [[ self.field_size[0]*self.robot_state[0], self.field_size[1]*self.robot_state[1] ]]

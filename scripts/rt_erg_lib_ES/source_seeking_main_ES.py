@@ -88,7 +88,7 @@ def main():
 
     
     rmse_values = []
-    SHOWN =   True
+    SHOWN =   False
     RMS_SHOW = not SHOWN
     end = False
     WRMSE = 1
@@ -127,7 +127,6 @@ def main():
                     # 将当前字典的值添加到合并字典中对应的键
                     exchange_dictionary_y[k].extend(v)
             # 1-3 receive samples
-            # print(exchange_dictionary)
             for i in range(robo_num):
                 if i in exchange_dictionary_X:
                     Robots[i].receive_samples(exchange_dictionary_X[i], exchange_dictionary_y[i])
@@ -140,7 +139,7 @@ def main():
         LCB_list = []
         for i in range(robo_num):
             # μ_test, σ_test = Robots[i].gp_regresssion(ucb_coeff=0.5)
-            μ_partial, ucb_partial = Robots[i].gp_regresssion(ucb_coeff=3)
+            μ_partial, ucb_partial = Robots[i].gp_regresssion(ucb_coeff=2)
             μ_estimation += μ_partial
             ucb += ucb_partial
             sources, lcb = Robots[i].get_estimated_source()
@@ -172,7 +171,7 @@ def main():
             ck_pack[i] = Robots[i].send_out_ck()
             phik_pack[i] = Robots[i].send_out_phik()
         found_source = unique_list(found_source)
-    
+        print(found_source)
         # 将子列表转换为元组，然后转换为集合
         found_source_set = {tuple(item) for item in found_source}
         if found_source_set == SOURCE_set:
@@ -238,7 +237,7 @@ def main():
                 fig.canvas.flush_events()
                 clear_output(wait=True)  # 清除输出并显示新图
         
-        if (iteration >= 0 and iteration % 10 == 0 and SHOWN) or end:
+        if (iteration >= 40 and iteration % 5 == 0 and SHOWN) or end:
             sizes = 5  # 可以是一个数字或者一个长度为N的数组，表示每个点的大小              
             # # 设置图表的总大小
             fig, axs = plt.subplots(1, 5, figsize=(24, 10), subplot_kw={'projection': '3d'})
@@ -335,6 +334,7 @@ def main():
             axs[4].set_title('UCB_changed')
             plt.show()
             if end:
+                plt.pause(1000)
                 break
             # plt.pause(0.01)
             # plt.clf()

@@ -39,20 +39,7 @@ def main():
     x_max = (0+FIELD_SIZE_X, 0+FIELD_SIZE_Y)
 
     ## Initialize GP (uni-GP)
-    # if True:
-    #     # Specify kernel with initial hyperparameter estimates
-    #     def kernel_initial(
-    #         σf_initial=1.0,         # covariance amplitude
-    #         ell_initial=1.0,        # length scale
-    #         σn_initial=0.1          # noise level
-    #     ):
-    #         return σf_initial**2 * RBF(length_scale=ell_initial) + WhiteKernel(noise_level=σn_initial)
-
-    #     gp = GaussianProcessRegressor(
-    #         kernel=kernel_initial(),
-    #         n_restarts_optimizer=10
-    #     )
-
+ 
     ## 用于采样的参数
     if True:
         # Predict points at uniform spacing to capture function
@@ -88,7 +75,7 @@ def main():
 
     
     rmse_values = []
-    SHOWN =   True
+    SHOWN =   False
     RMS_SHOW = not SHOWN
     end = False
     WRMSE = 1
@@ -96,7 +83,7 @@ def main():
         plt.ion()  # 开启interactive mode
         fig, ax = plt.subplots()
     ## start source seeking!
-    for iteration in range(100):
+    for iteration in range(300):
         
         print(iteration)
         
@@ -107,6 +94,7 @@ def main():
             for i in range(robo_num):
                 robot_locations.append(Robots[i].get_trajectory()[-1])
             neighbour_list = voronoi_neighbours(robot_locations)
+           
             # 1-2 update voronoi cell info to each agents and exchange samples 
             exchange_dictionary_X = {}
             exchange_dictionary_y = {}
@@ -126,6 +114,7 @@ def main():
                         exchange_dictionary_y[k] = []
                     # 将当前字典的值添加到合并字典中对应的键
                     exchange_dictionary_y[k].extend(v)
+            
             # 1-3 receive samples
             # print(exchange_dictionary)
             for i in range(robo_num):
@@ -135,17 +124,20 @@ def main():
         ## 2. train and estimate!
         μ_estimation = np.zeros(test_resolution)
         ucb = np.zeros(test_resolution)
-        # ucb = np.zeros(test_resolution)
         peaks = []
-        LCB_list = []
+        UCB_list = []
+        coeff = 0
+        if iteration < 100:
+            coeff=4*(1-iteration/100)    
+            
         for i in range(robo_num):
             # μ_test, σ_test = Robots[i].gp_regresssion(ucb_coeff=0.5)
-            μ_partial, ucb_partial = Robots[i].gp_regresssion(ucb_coeff=3)
+            μ_partial, ucb_partial = Robots[i].gp_regresssion(ucb_coeff=2)
             μ_estimation += μ_partial
-            ucb += ucb_partial
-            sources, lcb = Robots[i].get_estimated_source()
+            ucb += ucb_partial  
+            sources, ucb_value = Robots[i].get_estimated_source()
             peaks += sources
-            LCB_list += lcb 
+            UCB_list += ucb_value 
         # ucb miu estimation
         if 0:
             x = np.linspace(0, 49, 50)
@@ -172,7 +164,6 @@ def main():
             ck_pack[i] = Robots[i].send_out_ck()
             phik_pack[i] = Robots[i].send_out_phik()
         found_source = unique_list(found_source)
-    
         # 将子列表转换为元组，然后转换为集合
         found_source_set = {tuple(item) for item in found_source}
         if found_source_set == SOURCE_set:
@@ -184,23 +175,12 @@ def main():
             ucb_changed = Robots[i].receive_phik_consensus(phik_pack.copy()) 
         
         ## 4. Move and taking samples!
+        targets = []
         for i in range(robo_num):
-            # setpts = Robots[i].get_nextpts(control_mode = "DUCB") 
-            # setpts = Robots[i].get_nextpts(control_mode = "Boundry_setting") 
+            setpts, target = Robots[i].get_nextpts(control_mode = "UCB_greedy") 
+            targets.append(target)
             
-            if iteration < 5:
-                setpts = Robots[i].get_nextpts(control_mode = "ES_UNIFORM")
-            else:
-                # setpts = Robots[i].get_nextpts(phi_vals = ucb)
-                setpts = Robots[i].get_nextpts(control_mode = "ES_NORMAL")
-                
-        
-            # 4. Take samples and add to dataset
-            # measurements = sampling(setpts) 
-            # X_train = np.concatenate((X_train, setpts), axis=0)
-            # y_train = np.concatenate((y_train, measurements), axis=0)
-        print("=====================")    
-        
+      
     ####################################################################
     ## Visualize
         
@@ -238,12 +218,12 @@ def main():
                 fig.canvas.flush_events()
                 clear_output(wait=True)  # 清除输出并显示新图
         
-        if (iteration >= 0 and iteration % 10 == 0 and SHOWN) or end:
+        if (iteration >= 35 and iteration % 5 == 0 and SHOWN) or end:
             sizes = 5  # 可以是一个数字或者一个长度为N的数组，表示每个点的大小              
             # # 设置图表的总大小
-            fig, axs = plt.subplots(1, 5, figsize=(24, 10), subplot_kw={'projection': '3d'})
+            fig, axs = plt.subplots(1, 4, figsize=(24, 10), subplot_kw={'projection': '3d'})
             axs[0].remove()  # 移除第一个子图的3D投影
-            axs[0] = fig.add_subplot(1, 5, 1)  # 添加一个2D子图
+            axs[0] = fig.add_subplot(1, 4, 1)  # 添加一个2D子图
 
             ## Start plotting
             
@@ -277,11 +257,15 @@ def main():
                     peaks = np.array(peaks)
                     x_coords = peaks[:, 0] 
                     y_coords = peaks[:, 1] 
+                    axs[0].scatter(x_coords, y_coords, s=10, c='green', marker='x', zorder=3)
+                    # for i, (x, y) in enumerate(zip(x_coords, y_coords)):
+                    #     axs[0].text(x, y, f"{UCB_list[i]:.2f}", c='red', fontsize=6, ha='right', va='top')
+                
+                if (len(targets)!=0):
+                    targets = np.array(targets)
+                    x_coords = targets[:, 0] 
+                    y_coords = targets[:, 1] 
                     axs[0].scatter(x_coords, y_coords, s=10, c='red', marker='x', zorder=3)
-                    for i, (x, y) in enumerate(zip(x_coords, y_coords)):
-                        axs[0].text(x, y, f"{LCB_list[i]:.2f}", c='red', fontsize=6, ha='right', va='top')
-
-                # axs[0].legend(loc="lower left")
                 axs[0].set_aspect('equal')
 
 
@@ -302,9 +286,10 @@ def main():
             
             surf4 = axs[3].plot_surface(X_test_xx, X_test_yy, ucb, cmap='viridis', edgecolor='k', linewidth=0.5)
             fig.colorbar(surf4, ax=axs[3], pad=0.2, shrink=0.4)
+            axs[3].set_zlim([zmin, zmax])
             
-            surf5 = axs[4].plot_surface(X_test_xx, X_test_yy, ucb_changed, cmap='viridis', edgecolor='k', linewidth=0.5)
-            fig.colorbar(surf5, ax=axs[4], pad=0.2, shrink=0.4)
+            # surf5 = axs[4].plot_surface(X_test_xx, X_test_yy, ucb_changed, cmap='viridis', edgecolor='k', linewidth=0.5)
+            # fig.colorbar(surf5, ax=axs[4], pad=0.2, shrink=0.4)
             # zmin = 0  # 设置 z 轴的最小值
             # zmax = 0.3  # 设置 z 轴的最大值
             # axs[3].set_zlim([zmin, zmax])
@@ -329,14 +314,14 @@ def main():
             axs[3].set_zlabel('Z Label')
             axs[3].set_title('UCB')
             
-            axs[4].set_xlabel('X Label')
-            axs[4].set_ylabel('Y Label')
-            axs[4].set_zlabel('Z Label')
-            axs[4].set_title('UCB_changed')
+            # axs[4].set_xlabel('X Label')
+            # axs[4].set_ylabel('Y Label')
+            # axs[4].set_zlabel('Z Label')
+            # axs[4].set_title('UCB_changed')
             plt.show()
             if end:
+                plt.pause(1000)
                 break
-            # plt.pause(0.01)
             # plt.clf()
 
     print("Done")

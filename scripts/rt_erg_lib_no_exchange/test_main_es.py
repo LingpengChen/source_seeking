@@ -42,7 +42,7 @@ if __name__ == '__main__':
     print("first phik", np.mean(erg_ctrl.phik))   
     print('--- simulating ergodic coverage ---')
     log = {'trajectory' : []}
-    tf = 200                                                                                                                                                                                       
+    tf = 50                                                                                                                                                                                       
     state = env.reset()
 
     plt.figure(1)
@@ -53,6 +53,7 @@ if __name__ == '__main__':
     Erg_list = []
     for t in range(tf):
         ctrl = erg_ctrl(state)
+        print(np.linalg.norm(ctrl))
         Erg_list.append(erg_ctrl.Erg_metric)
         state = env.step(ctrl)
         log['trajectory'].append(state)
@@ -64,7 +65,7 @@ if __name__ == '__main__':
     print('--- finished simulating ---')
     xt = np.stack(log['trajectory'])
     plt.scatter(50*xt[:tf,0], 50*xt[:tf,1])
-    plt.pause(1) 
+    # plt.pause(3) 
     
     # trajectory statistics
     path = xt[:tf,model.explr_idx]
@@ -72,18 +73,18 @@ if __name__ == '__main__':
     val = convert_ck2dist(erg_ctrl.basis, ck, grid) 
     print(np.sum(val))
     
-    plt.title('time averaged statistics')
-    plt.imshow(val.reshape(50,50), cmap='viridis')
-    plt.colorbar()
-    plt.show()
-    # plt.figure(2)
-    # x = range(len(Erg_list))
+    # plt.title('time averaged statistics')
+    # plt.imshow(val.reshape(50,50), cmap='viridis')
+    # plt.colorbar()
+    # plt.show()
+    # # plt.figure(2)
+    # # x = range(len(Erg_list))
 
-    # plt.plot(x, Erg_list, marker='o', linestyle='-', color='b')
+    # # plt.plot(x, Erg_list, marker='o', linestyle='-', color='b')
 
-    plt.title('Erg_metric')
-    plt.xlabel('time')
-    plt.ylabel('metric value')
+    # plt.title('Erg_metric')
+    # plt.xlabel('time')
+    # plt.ylabel('metric value')
 
     # plt.title('Fourier reconstruction of target distribution')
     # phi = convert_phik2phi(erg_ctrl.basis, erg_ctrl.phik, t_dist.grid)

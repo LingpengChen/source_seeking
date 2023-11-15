@@ -4,7 +4,7 @@ from double_integrator import DoubleIntegrator
 import matplotlib.pyplot as plt
 
 class MPCController:
-    def __init__(self, model, horizon=10, Q=1, R=0.001):
+    def __init__(self, model, horizon=10, Q=1, R=0.01):
         self.model = model
         self.horizon = horizon
         self.u = cp.Variable((2, horizon))
@@ -34,8 +34,8 @@ class MPCController:
             cost += cp.quad_form(self.u[:, t], self.R)
             
             constraints += [self.x[:, t+1] == self.x[:, t] + (self.model.A @ self.x[:, t] + self.model.B @ self.u[:, t]) * self.dt]
-            constraints += [self.model.action_space.low <= self.u[:, t], 
-                            self.u[:, t] <= self.model.action_space.high]
+            constraints += [((self.model.A @ self.x[:, t] + self.model.B @ self.u[:, t]) * self.dt) <= 0.05]
+            constraints += [cp.norm(self.u[:, t], 2) <= 1]
             
         constraints += [self.x[:, 0] == x0]
         
