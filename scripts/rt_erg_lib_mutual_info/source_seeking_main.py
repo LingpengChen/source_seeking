@@ -4,14 +4,12 @@ np.random.seed(10)
 from matplotlib import pyplot as plt
 import matplotlib.gridspec as gridspec
 
-# from sklearn.gaussian_process import GaussianProcessRegressor
-# from sklearn.gaussian_process.kernels import RBF, WhiteKernel
-# from rt_erg_lib.controller import Controller
 
 from utils import find_peak, calculate_wrmse
 from controller import Controller
 
 from vonoroi_utils import voronoi_neighbours
+
 ## Initilize environment
 from IPython.display import clear_output
 
@@ -20,8 +18,6 @@ from environment_and_measurement import f, sampling, SOURCE, source_value # samp
                                                                         # while SOURCE and source_value are variables
 COLORS = ['blue', 'green', 'red', 'purple', 'orange', 'black']  # 你可以添加更多颜色
 SOURCE_set = {tuple(item) for item in SOURCE}
-# np.set_printoptions(threshold=np.inf, linewidth=np.inf, edgeitems=np.inf)
-# print(μ_test.reshape(self.test_resolution))
 
 def unique_list(redundant_list):
     # 将内部列表转换成元组
@@ -37,21 +33,6 @@ def main():
     FIELD_SIZE_Y = 10
     x_min = (0, 0)
     x_max = (0+FIELD_SIZE_X, 0+FIELD_SIZE_Y)
-
-    ## Initialize GP (uni-GP)
-    # if True:
-    #     # Specify kernel with initial hyperparameter estimates
-    #     def kernel_initial(
-    #         σf_initial=1.0,         # covariance amplitude
-    #         ell_initial=1.0,        # length scale
-    #         σn_initial=0.1          # noise level
-    #     ):
-    #         return σf_initial**2 * RBF(length_scale=ell_initial) + WhiteKernel(noise_level=σn_initial)
-
-    #     gp = GaussianProcessRegressor(
-    #         kernel=kernel_initial(),
-    #         n_restarts_optimizer=10
-    #     )
 
     ## 用于采样的参数
     if True:
@@ -88,7 +69,7 @@ def main():
 
     
     rmse_values = []
-    SHOWN =   False
+    SHOWN =   True
     RMS_SHOW = not SHOWN
     end = False
     WRMSE = 1
@@ -237,7 +218,7 @@ def main():
                 fig.canvas.flush_events()
                 clear_output(wait=True)  # 清除输出并显示新图
         
-        if (iteration >= 40 and iteration % 5 == 0 and SHOWN) or end:
+        if (iteration >= 0 and iteration % 5 == 0 and SHOWN) or end:
             sizes = 5  # 可以是一个数字或者一个长度为N的数组，表示每个点的大小              
             # # 设置图表的总大小
             fig, axs = plt.subplots(1, 5, figsize=(24, 10), subplot_kw={'projection': '3d'})
