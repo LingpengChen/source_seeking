@@ -4,24 +4,24 @@ np.random.seed(10)
 from matplotlib import pyplot as plt
 import matplotlib.gridspec as gridspec
 
+# from sklearn.gaussian_process import GaussianProcessRegressor
+# from sklearn.gaussian_process.kernels import RBF, WhiteKernel
+# from rt_erg_lib.controller import Controller
 
 from utils import find_peak, calculate_wrmse
-from controller_ES_UCB import Controller
-control_mode = "ES_NORMAL"
-# from controller_greedy import Controller
-# control_mode = "UCB_greedy"
-
-
+from controller import Controller
 
 from vonoroi_utils import voronoi_neighbours
 ## Initilize environment
 from IPython.display import clear_output
 
 from scipy.spatial import Voronoi, voronoi_plot_2d
-from environment_and_measurement import f, sampling, SOURCE, source_value, UCB_COEFF, LCB_THRESHOLD # sampling function is just f with noise
+from environment_and_measurement import f, sampling, SOURCE, source_value # sampling function is just f with noise
                                                                         # while SOURCE and source_value are variables
 COLORS = ['blue', 'green', 'red', 'purple', 'orange', 'black']  # 你可以添加更多颜色
 SOURCE_set = {tuple(item) for item in SOURCE}
+# np.set_printoptions(threshold=np.inf, linewidth=np.inf, edgeitems=np.inf)
+# print(μ_test.reshape(self.test_resolution))
 
 def unique_list(redundant_list):
     # 将内部列表转换成元组
@@ -38,6 +38,21 @@ def main():
     x_min = (0, 0)
     x_max = (0+FIELD_SIZE_X, 0+FIELD_SIZE_Y)
 
+    ## Initialize GP (uni-GP)
+    # if True:
+    #     # Specify kernel with initial hyperparameter estimates
+    #     def kernel_initial(
+    #         σf_initial=1.0,         # covariance amplitude
+    #         ell_initial=1.0,        # length scale
+    #         σn_initial=0.1          # noise level
+    #     ):
+    #         return σf_initial**2 * RBF(length_scale=ell_initial) + WhiteKernel(noise_level=σn_initial)
+
+    #     gp = GaussianProcessRegressor(
+    #         kernel=kernel_initial(),
+    #         n_restarts_optimizer=10
+    #     )
+
     ## 用于采样的参数
     if True:
         # Predict points at uniform spacing to capture function
@@ -51,10 +66,7 @@ def main():
     ## Initial robots
     # Give Robots Prior knowledge (all the same)
     if True:
-        if control_mode == "ES_NORMAL":
-            n_train = 10
-        else:
-            n_train = 10
+        n_train = 0
         # Number of training points and testing points
         X_train=None
         y_train=None
@@ -64,7 +76,7 @@ def main():
             y_train = sampling(X_train)
             
     if True:
-        robo_num = 1
+        robo_num = 3
         # robot_locations = [[3,3], [5, 4], [7,3]]
         robot_locations = [[1,2], [2, 2], [3,1]]
         Robots = []
@@ -76,7 +88,6 @@ def main():
 
     
     rmse_values = []
-    erg_metric = []
     SHOWN =   True
     RMS_SHOW = not SHOWN
     end = False
@@ -85,7 +96,7 @@ def main():
         plt.ion()  # 开启interactive mode
         fig, ax = plt.subplots()
     ## start source seeking!
-    for iteration in range(1000):
+    for iteration in range(100):
         
         print(iteration)
         
@@ -127,7 +138,8 @@ def main():
         peaks = []
         LCB_list = []
         for i in range(robo_num):
-            μ_partial, ucb_partial = Robots[i].gp_regresssion(ucb_coeff=UCB_COEFF, lcb_coeff=LCB_THRESHOLD)
+            # μ_test, σ_test = Robots[i].gp_regresssion(ucb_coeff=0.5)
+            μ_partial, ucb_partial = Robots[i].gp_regresssion(ucb_coeff=2)
             μ_estimation += μ_partial
             ucb += ucb_partial
             sources, lcb = Robots[i].get_estimated_source()
@@ -171,35 +183,66 @@ def main():
             ucb_changed = Robots[i].receive_phik_consensus(phik_pack.copy()) 
         
         ## 4. Move and taking samples!
-        targets = []
         for i in range(robo_num):
-            if control_mode == "ES_NORMAL":
-                setpts = Robots[i].get_nextpts(control_mode = "ES_NORMAL") 
-                erg_metric.append( Robots[i].Erg_ctrl.Erg_metric )
-            elif control_mode == "UCB_greedy":
-                setpts, target = Robots[i].get_nextpts(control_mode = "UCB_greedy") 
-                targets.append(target) 
+            # setpts = Robots[i].get_nextpts(control_mode = "DUCB") 
+            # setpts = Robots[i].get_nextpts(control_mode = "Boundry_setting") 
+            
+            if iteration < 5:
+                setpts = Robots[i].get_nextpts(control_mode = "ES_UNIFORM")
+            else:
+                # setpts = Robots[i].get_nextpts(phi_vals = ucb)
+                setpts = Robots[i].get_nextpts(control_mode = "ES_NORMAL")
+                
         
+            # 4. Take samples and add to dataset
+            # measurements = sampling(setpts) 
+            # X_train = np.concatenate((X_train, setpts), axis=0)
+            # y_train = np.concatenate((y_train, measurements), axis=0)
+        print("=====================")    
         
-        print("=====================")   
-        if WRMSE:
-            rmse = calculate_wrmse(μ_estimation, f(X_test).reshape(test_resolution))
-            rmse_values.append(rmse)
-        else:
-            rmse = np.sqrt(np.mean((μ_estimation - f(X_test).reshape(test_resolution)) ** 2))
-            rmse_values.append(rmse)
-          
     ####################################################################
     ## Visualize
         
-        if (iteration >= 20 and iteration % 30 == 0 and SHOWN) or end:
+        if RMS_SHOW:
+            
+            if WRMSE:
+                rmse = calculate_wrmse(μ_estimation, f(X_test).reshape(test_resolution))
+                rmse_values.append(rmse)
+                print(rmse)
+                # 更新图表
+                ax.clear()  # 清除旧的线条
+                ax.plot(rmse_values)  # 绘制新的线条
+                ax.set_title('WRMSE over iterations')
+                ax.set_xlabel('Iteration')
+                ax.set_ylabel('WRMSE')
+
+                # 重绘图表
+                fig.canvas.draw()
+                fig.canvas.flush_events()
+                clear_output(wait=True)  # 清除输出并显示新图
+                
+            else:
+                rmse = np.sqrt(np.mean((μ_estimation - f(X_test).reshape(test_resolution)) ** 2))
+                rmse_values.append(rmse)
+                print(rmse)
+                # 更新图表
+                ax.clear()  # 清除旧的线条
+                ax.plot(rmse_values)  # 绘制新的线条
+                ax.set_title('RMSE over iterations')
+                ax.set_xlabel('Iteration')
+                ax.set_ylabel('RMSE')
+
+                # 重绘图表
+                fig.canvas.draw()
+                fig.canvas.flush_events()
+                clear_output(wait=True)  # 清除输出并显示新图
+        
+        if (iteration >= 20 and iteration % 10 == 0 and SHOWN) or end:
             sizes = 5  # 可以是一个数字或者一个长度为N的数组，表示每个点的大小              
             # # 设置图表的总大小
             fig, axs = plt.subplots(1, 5, figsize=(24, 10), subplot_kw={'projection': '3d'})
             axs[0].remove()  # 移除第一个子图的3D投影
             axs[0] = fig.add_subplot(1, 5, 1)  # 添加一个2D子图
-            axs[4].remove()  # 移除第一个子图的3D投影
-            axs[4] = fig.add_subplot(1, 5, 5)  # 添加一个2D子图
 
             ## Start plotting
             
@@ -208,12 +251,11 @@ def main():
                 contour = axs[0].contourf(X_test_xx, X_test_yy, f(X_test).reshape(test_resolution))
 
                 # 1-1) plot Voronoi tessellation
+                vor = Voronoi(robot_locations)
+                voronoi_plot_2d(vor, ax=axs[0], show_vertices=False)
                 axs[0].set_xlim([0, 10])  # 你可以根据需要调整这些值
                 axs[0].set_ylim([0, 10])  
-            
-                if robo_num > 1:
-                    vor = Voronoi(robot_locations)
-                    voronoi_plot_2d(vor, ax=axs[0], show_vertices=False)
+                
                 # 1-2) trajectory
                 for i in range(robo_num):
                     color = COLORS[i % len(COLORS)]
@@ -234,15 +276,11 @@ def main():
                     peaks = np.array(peaks)
                     x_coords = peaks[:, 0] 
                     y_coords = peaks[:, 1] 
-                    axs[0].scatter(x_coords, y_coords, s=10, c='green', marker='x', zorder=3)
-                    # for i, (x, y) in enumerate(zip(x_coords, y_coords)):
-                    #     axs[0].text(x, y, f"{LCB_list[i]:.2f}", c='red', fontsize=6, ha='right', va='top')
-
-                if (len(targets)!=0):
-                    targets = np.array(targets)
-                    x_coords = targets[:, 0] 
-                    y_coords = targets[:, 1] 
                     axs[0].scatter(x_coords, y_coords, s=10, c='red', marker='x', zorder=3)
+                    for i, (x, y) in enumerate(zip(x_coords, y_coords)):
+                        axs[0].text(x, y, f"{LCB_list[i]:.2f}", c='red', fontsize=6, ha='right', va='top')
+
+                # axs[0].legend(loc="lower left")
                 axs[0].set_aspect('equal')
 
 
@@ -264,20 +302,8 @@ def main():
             surf4 = axs[3].plot_surface(X_test_xx, X_test_yy, ucb, cmap='viridis', edgecolor='k', linewidth=0.5)
             fig.colorbar(surf4, ax=axs[3], pad=0.2, shrink=0.4)
             
-            # surf5 = axs[4].plot_surface(X_test_xx, X_test_yy, ucb_changed, cmap='viridis', edgecolor='k', linewidth=0.5)
-            # fig.colorbar(surf5, ax=axs[4], pad=0.2, shrink=0.4)
-            
-                         
-            if WRMSE:
-                # 更新图表
-                axs[4].set_title('WRMSE over iterations')
-            else:
-                axs[4].set_title('RMSE over iterations')
-            axs[4].plot(range(len(rmse_values)),rmse_values)  # 绘制新的线条
-            axs[4].set_xlabel('Iteration')
-            axs[4].set_ylabel('RMSE')
-
-              
+            surf5 = axs[4].plot_surface(X_test_xx, X_test_yy, ucb_changed, cmap='viridis', edgecolor='k', linewidth=0.5)
+            fig.colorbar(surf5, ax=axs[4], pad=0.2, shrink=0.4)
             # zmin = 0  # 设置 z 轴的最小值
             # zmax = 0.3  # 设置 z 轴的最大值
             # axs[3].set_zlim([zmin, zmax])
@@ -302,19 +328,13 @@ def main():
             axs[3].set_zlabel('Z Label')
             axs[3].set_title('UCB')
             
-            # axs[4].set_xlabel('X Label')
-            # axs[4].set_ylabel('Y Label')
-            # axs[4].set_zlabel('Z Label')
-            # axs[4].set_title('UCB_changed')
+            axs[4].set_xlabel('X Label')
+            axs[4].set_ylabel('Y Label')
+            axs[4].set_zlabel('Z Label')
+            axs[4].set_title('UCB_changed')
             plt.show()
-            
             if end:
-                for i in rmse_values:
-                    print(i)
-                print("==========")
-                for i in erg_metric:
-                    print(i)
-                plt.pause(20)
+                plt.pause(1000)
                 break
             # plt.pause(0.01)
             # plt.clf()

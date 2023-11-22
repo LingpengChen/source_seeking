@@ -8,39 +8,35 @@ def get_robot_from_region(dictionary, target_value):
     return keys_with_value[0]
 
 def voronoi_neighbours(robots):
+    # 创建 Voronoi 对象
+    vor = Voronoi(robots)
+
+    # 绘制 Voronoi 图
+    # voronoi_plot_2d(vor, show_vertices=True)
     
-    if len(robots) > 1:
-        neighbour_list = [] # neighbours for each robot
+    robot_region_dict = {}
+    # 在每个输入点旁边显示其对应的区域索引
+    for i, (x, y) in enumerate(robots):
+        # plt.text(x, y, f'robot {i}', color='red', fontsize=12, ha='right')
+        robot_region_dict[i] = vor.point_region[i]
         
-        # 创建 Voronoi 对象
-        vor = Voronoi(robots)
 
-        # 绘制 Voronoi 图
-        # voronoi_plot_2d(vor, show_vertices=True)
+    # 找到并打印每个机器人的邻居区域
+    neighbour_list = [] # neighbours for each robot
+    for i in range(len(robots)):
+     
+        neighbors = []
+        for ridge in vor.ridge_points:
+            if i in ridge:
+                if ridge[0] == i:
+                    neighbors.append(vor.point_region[ridge[1]])
+                else:
+                    neighbors.append(vor.point_region[ridge[0]])
+        neighbors = [get_robot_from_region(robot_region_dict, region) for region in neighbors]
+        # print(f'Robot {i} in Region {vor.point_region[i]} has neighbors: {[get_robot_from_region(robot_region_dict, region) for region in neighbors]}')
+        neighbors.sort()
+        neighbour_list.append(neighbors)
         
-        robot_region_dict = {}
-        # 在每个输入点旁边显示其对应的区域索引
-        for i, (x, y) in enumerate(robots):
-            # plt.text(x, y, f'robot {i}', color='red', fontsize=12, ha='right')
-            robot_region_dict[i] = vor.point_region[i]
-            
-
-        # 找到并打印每个机器人的邻居区域
-        for i in range(len(robots)):
-        
-            neighbors = []
-            for ridge in vor.ridge_points:
-                if i in ridge:
-                    if ridge[0] == i:
-                        neighbors.append(vor.point_region[ridge[1]])
-                    else:
-                        neighbors.append(vor.point_region[ridge[0]])
-            neighbors = [get_robot_from_region(robot_region_dict, region) for region in neighbors]
-            # print(f'Robot {i} in Region {vor.point_region[i]} has neighbors: {[get_robot_from_region(robot_region_dict, region) for region in neighbors]}')
-            neighbors.sort()
-            neighbour_list.append(neighbors)
-    else:
-        neighbour_list = [[]]       
     return neighbour_list
 
 def generate_voronoi(robots, index):
