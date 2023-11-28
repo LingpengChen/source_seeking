@@ -4,7 +4,9 @@ import numpy as np
 
 FOUND_SOURCE_THRESHOLD = 0.25 # to distinguish whether this is one source or two source
 # UCB_COEFF = 2 # ES
-UCB_COEFF = 2 # greedy
+# UCB_COEFF = 2 # greedy UCB
+UCB_COEFF = 1 # greedy MI
+
 LCB_THRESHOLD = 0.12 # determine to seek which peak 
 FIELD_SIZE_X = 10
 FIELD_SIZE_Y = 10

@@ -6,11 +6,12 @@ import matplotlib.gridspec as gridspec
 
 
 from utils import find_peak, calculate_wrmse
-from controller_ES_UCB import Controller
-control_mode = "ES_NORMAL"
+# from controller_ES_UCB import Controller
+# control_mode = "ES_NORMAL"
 # from controller_greedy import Controller
 # control_mode = "UCB_greedy"
-
+from controller_greedy_MI import Controller
+control_mode = "MI_greedy"
 
 
 from vonoroi_utils import voronoi_neighbours
@@ -52,9 +53,9 @@ def main():
     # Give Robots Prior knowledge (all the same)
     if True:
         if control_mode == "ES_NORMAL":
-            n_train = 10
+            n_train = 0
         else:
-            n_train = 10
+            n_train = 0
         # Number of training points and testing points
         X_train=None
         y_train=None
@@ -176,8 +177,8 @@ def main():
             if control_mode == "ES_NORMAL":
                 setpts = Robots[i].get_nextpts(control_mode = "ES_NORMAL") 
                 erg_metric.append( Robots[i].Erg_ctrl.Erg_metric )
-            elif control_mode == "UCB_greedy":
-                setpts, target = Robots[i].get_nextpts(control_mode = "UCB_greedy") 
+            elif control_mode == "UCB_greedy" or control_mode == "MI_greedy":
+                setpts, target = Robots[i].get_nextpts(control_mode) 
                 targets.append(target) 
         
         
@@ -192,7 +193,7 @@ def main():
     ####################################################################
     ## Visualize
         
-        if (iteration >= 20 and iteration % 30 == 0 and SHOWN) or end:
+        if (iteration >= 180 and iteration % 10 == 0 and SHOWN) or end:
             sizes = 5  # 可以是一个数字或者一个长度为N的数组，表示每个点的大小              
             # # 设置图表的总大小
             fig, axs = plt.subplots(1, 5, figsize=(24, 10), subplot_kw={'projection': '3d'})

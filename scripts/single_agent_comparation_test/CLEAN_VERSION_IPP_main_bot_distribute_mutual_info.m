@@ -404,7 +404,7 @@ for it = 1 : it_num
     % compute MI lower bound as phi for optimizing sample selection
     phi_func = zeros(length(Fss),1);
     for iij = 1:num_bot
-        phi_func(k == iij) = kappa*est_mu(k == iij) + beta*(sqrt(est_s2(k == iij) + gamma_gp(iij)) - sqrt(gamma_gp(iij)));
+        phi_func(k == iij) = kappa*est_mu(k == iij) + beta*(sqrt(est_s2(k == iij) +     (iij)) - sqrt(gamma_gp(iij)));
     end
     
     % create train test split
