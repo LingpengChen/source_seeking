@@ -75,7 +75,7 @@ def main():
 
     
     rmse_values = []
-    SHOWN =   True
+    SHOWN =   False
     RMS_SHOW = not SHOWN
     end = False
     WRMSE = 1
@@ -218,7 +218,7 @@ def main():
                 fig.canvas.flush_events()
                 clear_output(wait=True)  # 清除输出并显示新图
         
-        if (iteration >= 25 and iteration % 5 == 0 and SHOWN) or end:
+        if (iteration >= 25 and iteration % 25 == 0 and SHOWN) or end:
             sizes = 5  # 可以是一个数字或者一个长度为N的数组，表示每个点的大小              
             # # 设置图表的总大小
             fig, axs = plt.subplots(1, 4, figsize=(24, 10), subplot_kw={'projection': '3d'})
@@ -320,7 +320,9 @@ def main():
             # axs[4].set_title('UCB_changed')
             plt.show()
             if end:
-                plt.pause(1000)
+                print(rmse_values)
+                plt.show()
+                plt.pause(10)
                 break
             # plt.clf()
 

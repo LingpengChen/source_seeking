@@ -36,8 +36,6 @@ class Controller(object): # python (x,y) therefore col index first, row next
         self.index = index
         self.agent_name = str(index)
         
-        ## robot node and communication
-
         ## field information
         # test_resolution
         self.test_resolution = test_resolution # [50, 50]
@@ -84,14 +82,11 @@ class Controller(object): # python (x,y) therefore col index first, row next
         self.estimation = None
         self.variance = None
         self.peaks_cord = None
-        self.peaks_MI = None
-        self.gp_mi = None
+        self.peaks_LCB = None
         self.visited_peaks_cord = []
-        self.stuck_points = []
         ## MI
         self.gamma_gp = 0
-
-        
+    
     def receive_prior_knowledge(self, X_train=None, y_train=None):
         if X_train is not None:
             assert X_train.shape[0] == y_train.shape[0], "Error: The number of elements in X_train and y_train must be equal."
@@ -162,19 +157,19 @@ class Controller(object): # python (x,y) therefore col index first, row next
             self.samples_Y = np.concatenate((self.samples_Y, exchanged_samples_y), axis=0)
     
     # step 2 calcualte GP
-    def gp_regresssion(self, ucb_coeff=1, lcb_coeff=None): # the X_train, y_train is only for the prior knowledge
+    def gp_regresssion(self, ucb_coeff=2, lcb_coeff=2): # the X_train, y_train is only for the prior knowledge
         # # 找到 samples_X 中重复元素的索引
         # 根据这些索引保留 samples_X 和 samples_Y 中的非重复元素
         _, unique_indices = np.unique(self.samples_X, axis=0, return_index=True)
         self.samples_X = self.samples_X[unique_indices]
-        self.samples_Y = self.samples_Y[unique_indices]          
+        self.samples_Y = self.samples_Y[unique_indices]      
         self.gp.fit(self.samples_X, self.samples_Y)
         # Bayesian inference
-        μ_test, σ_test = self.gp.predict(self.X_test, return_std=True)
+        μ_test, σ_test = self.gp.predict(self.X_test, return_std=True)     
         
         self.estimation = μ_test.reshape(self.test_resolution)
         self.variance = σ_test.reshape(self.test_resolution)
-        
+
         # update gamma based on variance of xt from the last iteration, i.e., gama_t-1
         if len(self.trajectory) > 1:
             _, variance = self.gp.predict([self.trajectory[-1]], return_std=True)
@@ -184,13 +179,14 @@ class Controller(object): # python (x,y) therefore col index first, row next
         mutual_info_dist = μ_test + ucb_coeff * (np.sqrt(σ_test + self.gamma_gp) - np.sqrt(self.gamma_gp))
         self.gp_mi = mutual_info_dist.reshape(self.test_resolution)
         
+        # calculate phik based on MI
         self.phik = convert_phi2phik(self.Erg_ctrl.basis, self.gp_mi, self.grid)
         phi = convert_phik2phi(self.Erg_ctrl.basis, self.phik , self.grid)
         
         # selection of the next query location through argmax
-        self.estimate_source()
+        self.estimate_source(lcb_coeff)
         return self.estimation*self.responsible_region, self.gp_mi*self.responsible_region
-    
+        
     # step 3 exchange phik ck visted source
     def send_out_phik(self):
         if self.phik is not None:
@@ -228,49 +224,53 @@ class Controller(object): # python (x,y) therefore col index first, row next
         self.visited_peaks_cord = peaks
         
     # step 4 move will ergodic control
-    def get_nextpts(self, phi_vals=None, control_mode="MI_greedy"):
+    def get_nextpts(self, phi_vals=None, control_mode="ES_NORMAL"):
         ctrl = None
-        target = None    
+        target = None
+        active_sensing = True   
+        if control_mode == "ES_UNIFORM":
+            # setting the phik on the ergodic controller    
+            phi_vals = np.ones(self.test_resolution)
+            phi_vals /= np.sum(phi_vals)
+            self.Erg_ctrl.phik = convert_phi2phik(self.Erg_ctrl.basis, phi_vals, self.grid)
+            ctrl = self.Erg_ctrl(self.robot_state)
            
-        if control_mode == "MI_greedy":
+        elif control_mode == "ES_NORMAL":
+            if phi_vals is not None:
+                phi_vals /= np.sum(phi_vals)
+                self.Erg_ctrl.phik = convert_phi2phik(self.Erg_ctrl.basis, phi_vals, self.grid)
+
+            # determine whether to active sensing or source seeking
+            
             # remove the peak that has already been visited
             indices_to_remove = []
             for i, peak in enumerate(self.peaks_cord):
-                for visited_peak in (self.visited_peaks_cord+self.stuck_points):
-                    if np.linalg.norm(np.array(peak) - np.array(visited_peak)) < 0.25:
+                for visited_peak in self.visited_peaks_cord:
+                    if np.linalg.norm(np.array(peak) - np.array(visited_peak)) < 2*FOUND_SOURCE_THRESHOLD:
                         indices_to_remove.append(i)
                         break
+
             peaks_cord = [peak for i, peak in enumerate(self.peaks_cord) if i not in indices_to_remove]
-            peaks_MI_value = [mi_value for i, mi_value in enumerate(self.peaks_MI) if i not in indices_to_remove]
+            peaks_LCB = [lcb for i, lcb in enumerate(self.peaks_LCB) if i not in indices_to_remove]
             
-            if len(peaks_cord) > 0:
-                index = np.argmax(peaks_MI_value)
+            if peaks_LCB and np.max(peaks_LCB) > LCB_THRESHOLD:   # determine to seek which peak   
+                index = np.argmax(peaks_LCB)
+                distance = cdist([self.trajectory[-1]], [peaks_cord[index]])[0][0]
                 target = peaks_cord[index]
-                ctrl_target = np.array(target) / self.field_size[0]
-                ctrl = self.Mpc_ctrl(self.robot_state, ctrl_target)
+                active_sensing = False
+
+            if active_sensing:
+                ctrl = self.Erg_ctrl(self.robot_state)
+                print("ES: ", np.linalg.norm(ctrl))
                 
-            
-            else: # the peak within the cell has been visited
-                # The maximum MI point within the region
-                self_gp_mi = self.gp_mi * self.responsible_region
-                mi_value = np.max(self_gp_mi)
-                max_index_1d = np.argmax(self_gp_mi.T)
-                max_index_2d = np.unravel_index(max_index_1d, self_gp_mi.shape)
-                target = np.array(max_index_2d) * (self.field_size[0] / self.test_resolution[0])
+            else: # source seeking
+                self.Erg_ctrl.update_trajectory(self.robot_state)
                 ctrl_target = np.array(target) / self.field_size[0]
+                print(self.robot_state, ctrl_target)
                 ctrl = self.Mpc_ctrl(self.robot_state, ctrl_target)
-                
-        print("target is", target)
-        print("visited_peaks_cord:", self.visited_peaks_cord)
-        print("stuck_points", self.stuck_points)
-            
-        pre_state = self.robot_state    
+                print("mpc: ", np.linalg.norm(ctrl), "with target: ", target)
+       
         self.robot_state = self.robot_dynamic.step(ctrl)         
-        if np.linalg.norm((pre_state - self.robot_state)[:2])*self.field_size[0] < 0.05: # get stuck at none sources area 
-            self.stuck_points.append(self.field_size*self.robot_state[:2])
-            print(np.linalg.norm((pre_state - self.robot_state)[:2])*self.field_size[0])
-            print("For robot", i, "All the peak within the cell has been visited, so let's get to the maximum places ")
-        
         setpoint = [[ self.field_size[0]*self.robot_state[0], self.field_size[1]*self.robot_state[1] ]]
        
         self.trajectory = self.trajectory + setpoint
@@ -278,44 +278,62 @@ class Controller(object): # python (x,y) therefore col index first, row next
         
         # determine whether the source is found
         source_cord = find_source(setpoint, FOUND_SOURCE_THRESHOLD)
-        if source_cord is not None:
+        if not active_sensing and source_cord is not None:
             print("source", source_cord, "is found by Robot ", self.index, "!", "The target is ", target)
             self.visited_peaks_cord.append(list(source_cord))
 
         self.samples_X = np.concatenate((self.samples_X, setpoint), axis=0)
         self.samples_Y = np.concatenate((self.samples_Y, sampling(setpoint)), axis=0)
-        return setpoint, target
+        
+        
+        return setpoint
+    
     
     # Tools
     def get_trajectory(self):
         # return [self.field_size[0]*self.robot_state[0], self.field_size[1]*self.robot_state[1]]
         return self.trajectory
     
-    def estimate_source(self):
-        peaks, peaks_mi_gp_value = find_peak(self.gp_mi, strict=False)
-        
-        peaks_cord = np.array(peaks) * (self.field_size[0]/self.test_resolution[0]) # [col_mat, ...]
+    def estimate_source(self, lcb_coeff=2):
+        peaks = np.array(find_peak(self.estimation)) # [col_mat, ...]
+
+        real_res_ratio = self.field_size[0]/self.test_resolution[0] # 10m/50 = 0.2m
+        increased_resolution_ratio = self.test_resolution[0]/2 # 25
+        real_res_ratio_new = real_res_ratio/increased_resolution_ratio
+        X_test = self.X_test/increased_resolution_ratio # increase resolution of sampling point [[0,0.2]] => [[0,0.2/ratio]]
+        peaks_cord = [] # this is all peaks without filtering (over the whole field)
+        for peak in peaks:
+            x, y =  real_res_ratio * (peak[0]-1),  real_res_ratio * (peak[1]-1) # real coordinate (start from upper left)
+            X_test_copy = np.copy(X_test)
+            X_test_copy[:, 0] += x
+            X_test_copy[:, 1] += y  
+            μ_test, σ_test = self.gp.predict(X_test_copy, return_std=True)
+            new_peaks = np.array(find_peak(μ_test.reshape(self.test_resolution), strict=False)[0])
+            
+            peak_x, peak_y = x + real_res_ratio_new*new_peaks[0], y + real_res_ratio_new*new_peaks[0]
+            peaks_cord.append([peak_x, peak_y])
 
         self.peaks_cord = [] # filter out the peaks out of the voronoi cell
-        self.peaks_MI = []
-        
-        # μ, σ = self.gp.predict(peaks_cord, return_std=True)
-        own_loc = self.trajectory[-1]
-        neighbour_loc = self.neighbour_loc
-        bots_loc = [own_loc] + neighbour_loc
-        distances = cdist(np.array(peaks_cord), bots_loc, metric='euclidean')
-        closest_robot_index = np.argmin(distances, axis=1)
-        
-        i=0
-        for peak in peaks_cord: # find the peak within the Voronoi cell
-            if closest_robot_index[i] == 0: 
-                self.peaks_cord.append(list(peak))
-                self.peaks_MI.append(peaks_mi_gp_value[i])s
-            i+=1
-  
-        return self.peaks_cord, self.peaks_MI
+        self.peaks_LCB = []
+        if len(peaks_cord):
+            μ, σ = self.gp.predict(peaks_cord, return_std=True)
+            own_loc = self.trajectory[-1]
+            neighbour_loc = self.neighbour_loc
+            bots_loc = [own_loc] + neighbour_loc
+            distances = cdist(np.array(peaks_cord), bots_loc, metric='euclidean')
+            closest_robot_index = np.argmin(distances, axis=1)
+            
+            i=0
+            for peak in peaks_cord:
+                if closest_robot_index[i] == 0: 
+                    LCB = μ[i] - lcb_coeff*σ[i]
+                    self.peaks_LCB.append(LCB)
+                    self.peaks_cord.append(peak)
+                i+=1
 
+            
+        return self.peaks_cord, self.peaks_LCB
     
     def get_estimated_source(self):
-        return self.peaks_cord, self.peaks_MI 
+        return self.peaks_cord, self.peaks_LCB 
     

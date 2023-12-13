@@ -10,9 +10,10 @@ from utils import find_peak, calculate_wrmse
 # control_mode = "ES_NORMAL"
 # from controller_greedy import Controller
 # control_mode = "UCB_greedy"
-from controller_greedy_MI import Controller
-control_mode = "MI_greedy"
-
+# from controller_greedy_MI import Controller
+# control_mode = "MI_greedy"
+from controller_ES_MI import Controller
+control_mode = "ES_NORMAL"
 
 from vonoroi_utils import voronoi_neighbours
 ## Initilize environment
