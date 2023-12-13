@@ -75,9 +75,9 @@ def find_peak(matrix, strict=True):
                 if all(matrix[i, j] > neighbor for neighbor in neighbors):
                     strict_local_maxima.append([i,j])
         if (len(strict_local_maxima)):
-            return np.array(strict_local_maxima)[:, [1, 0]], matrix[strict_local_maxima]
+            return np.array(strict_local_maxima)[:, [1, 0]], matrix[[i[0] for i in strict_local_maxima], [i[1] for i in strict_local_maxima]]
         else:
-            return strict_local_maxima, strict_local_maxima_value
+            return np.array([]), np.array([])
 
     else:
         return local_maxima_coords[:, [1, 0]], local_max_values

@@ -5,15 +5,16 @@ from matplotlib import pyplot as plt
 import matplotlib.gridspec as gridspec
 
 
-from utils import find_peak, calculate_wrmse
+from utils import calculate_wrmse
 # from controller_ES_UCB import Controller
-# control_mode = "ES_NORMAL"
-# from controller_greedy import Controller
+# control_mode = "ES_UCB"
+# from controller_ES_MI import Controller
+# control_mode = "ES_MI"
+
+# from controller_greedy_UCB import Controller
 # control_mode = "UCB_greedy"
-# from controller_greedy_MI import Controller
-# control_mode = "MI_greedy"
-from controller_ES_MI import Controller
-control_mode = "ES_NORMAL"
+from controller_greedy_MI import Controller
+control_mode = "MI_greedy"
 
 from vonoroi_utils import voronoi_neighbours
 ## Initilize environment
@@ -53,10 +54,10 @@ def main():
     ## Initial robots
     # Give Robots Prior knowledge (all the same)
     if True:
-        if control_mode == "ES_NORMAL":
+        if control_mode == "ES_UCB" or control_mode == "ES_MI":
             n_train = 0
         else:
-            n_train = 0
+            n_train = 10
         # Number of training points and testing points
         X_train=None
         y_train=None
@@ -175,11 +176,11 @@ def main():
         ## 4. Move and taking samples!
         targets = []
         for i in range(robo_num):
-            if control_mode == "ES_NORMAL":
-                setpts = Robots[i].get_nextpts(control_mode = "ES_NORMAL") 
+            if control_mode == "ES_UCB" or control_mode == "ES_MI":
+                setpts = Robots[i].get_nextpts(control_mode=control_mode) 
                 erg_metric.append( Robots[i].Erg_ctrl.Erg_metric )
             elif control_mode == "UCB_greedy" or control_mode == "MI_greedy":
-                setpts, target = Robots[i].get_nextpts(control_mode) 
+                setpts, target = Robots[i].get_nextpts(control_mode=control_mode) 
                 targets.append(target) 
         
         
@@ -194,7 +195,7 @@ def main():
     ####################################################################
     ## Visualize
         
-        if (iteration >= 180 and iteration % 10 == 0 and SHOWN) or end:
+        if (iteration >= 20 and iteration % 10 == 0 and SHOWN) or end:
             sizes = 5  # 可以是一个数字或者一个长度为N的数组，表示每个点的大小              
             # # 设置图表的总大小
             fig, axs = plt.subplots(1, 5, figsize=(24, 10), subplot_kw={'projection': '3d'})

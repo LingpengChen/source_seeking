@@ -287,7 +287,7 @@ class Controller(object): # python (x,y) therefore col index first, row next
         return self.trajectory
     
     def estimate_source(self, ucb_coeff):
-        peaks = find_peak(self.ucb, strict=False)
+        peaks, peaks_value = find_peak(self.ucb, strict=False)
         peaks_cord = np.array(peaks) * (self.field_size[0]/self.test_resolution[0]) # [col_mat, ...]
             
 

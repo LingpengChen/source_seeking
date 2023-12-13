@@ -62,7 +62,7 @@ class Controller(object): # python (x,y) therefore col index first, row next
         self.robot_state[:2] = np.array([start_position[0]/self.field_size[0], start_position[1]/self.field_size[1]])
         self.robot_dynamic.reset(self.robot_state)
         self.Erg_ctrl    = RTErgodicControl(DoubleIntegrator(), weights=0.01, horizon=15, num_basis=10, batch_size=-1)
-        self.Mpc_ctrl    = MPCController(DoubleIntegrator(), horizon=20, Q=1, R=0.001)
+        self.Mpc_ctrl    = MPCController(DoubleIntegrator(), horizon=10, Q=1, R=0.01)
         # samples 
         self.samples_X = np.array([start_position])
         self.samples_Y = np.array(sampling([start_position]))
@@ -310,7 +310,7 @@ class Controller(object): # python (x,y) therefore col index first, row next
         for peak in peaks_cord: # find the peak within the Voronoi cell
             if closest_robot_index[i] == 0: 
                 self.peaks_cord.append(list(peak))
-                self.peaks_MI.append(peaks_mi_gp_value[i])s
+                self.peaks_MI.append(peaks_mi_gp_value[i])
             i+=1
   
         return self.peaks_cord, self.peaks_MI

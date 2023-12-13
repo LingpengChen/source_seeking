@@ -218,7 +218,7 @@ class Controller(object): # python (x,y) therefore col index first, row next
         self.visited_peaks_cord = peaks
         
     # step 4 move will ergodic control
-    def get_nextpts(self, phi_vals=None, control_mode="ES_NORMAL"):
+    def get_nextpts(self, phi_vals=None, control_mode="ES_UCB"):
         ctrl = None
         target = None
         active_sensing = True   
@@ -229,7 +229,7 @@ class Controller(object): # python (x,y) therefore col index first, row next
             self.Erg_ctrl.phik = convert_phi2phik(self.Erg_ctrl.basis, phi_vals, self.grid)
             ctrl = self.Erg_ctrl(self.robot_state)
            
-        elif control_mode == "ES_NORMAL":
+        elif control_mode == "ES_UCB":
             if phi_vals is not None:
                 phi_vals /= np.sum(phi_vals)
                 self.Erg_ctrl.phik = convert_phi2phik(self.Erg_ctrl.basis, phi_vals, self.grid)
@@ -260,7 +260,7 @@ class Controller(object): # python (x,y) therefore col index first, row next
             else: # source seeking
                 self.Erg_ctrl.update_trajectory(self.robot_state)
                 ctrl_target = np.array(target) / self.field_size[0]
-                print(self.robot_state, ctrl_target)
+                # print(self.robot_state, ctrl_target)
                 ctrl = self.Mpc_ctrl(self.robot_state, ctrl_target)
                 print("mpc: ", np.linalg.norm(ctrl), "with target: ", target)
        
@@ -289,7 +289,7 @@ class Controller(object): # python (x,y) therefore col index first, row next
         return self.trajectory
     
     def estimate_source(self, lcb_coeff=2):
-        peaks = np.array(find_peak(self.estimation)) # [col_mat, ...]
+        peaks, peaks_value = find_peak(self.estimation, strict=True) # [col_mat, ...]
 
         real_res_ratio = self.field_size[0]/self.test_resolution[0] # 10m/50 = 0.2m
         increased_resolution_ratio = self.test_resolution[0]/2 # 25
@@ -302,7 +302,8 @@ class Controller(object): # python (x,y) therefore col index first, row next
             X_test_copy[:, 0] += x
             X_test_copy[:, 1] += y  
             μ_test, σ_test = self.gp.predict(X_test_copy, return_std=True)
-            new_peaks = np.array(find_peak(μ_test.reshape(self.test_resolution), strict=False)[0])
+            peaks_refine, peaks_refine_value = find_peak(μ_test.reshape(self.test_resolution), strict=False)
+            new_peaks = np.array(peaks_refine[0])
             
             peak_x, peak_y = x + real_res_ratio_new*new_peaks[0], y + real_res_ratio_new*new_peaks[0]
             peaks_cord.append([peak_x, peak_y])
