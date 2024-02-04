@@ -7,7 +7,6 @@ from mpc import MPCController
 from target_dist import TargetDist
 from scipy.spatial.distance import cdist
 from scipy.spatial import Voronoi, distance
-import matplotlib.pyplot as plt
 
 from utils import convert_phi2phik, convert_ck2dist, convert_traj2ck, convert_phik2phi, find_peak
 import numpy as np
@@ -16,13 +15,12 @@ from scipy.io import loadmat
 import rospy
 from grid_map_msgs.msg import GridMap
 from source_seeking.msg import Ck
-from environment_and_measurement import Environment
-from environment_and_measurement import FOUND_SOURCE_THRESHOLD, LCB_THRESHOLD, CTR_MAG_DETERMIN_STUCK, STUCK_PTS_THRESHOLD 
+from environment_and_measurement import Environment, DEBUG
+from environment_and_measurement import CAM_FOV, SRC_MUT_D_THRESHOLD, LCB_THRESHOLD, CTR_MAG_DETERMIN_STUCK, STUCK_PTS_THRESHOLD 
 
 from sklearn.gaussian_process import GaussianProcessRegressor
 from sklearn.gaussian_process.kernels import RBF, WhiteKernel
 
-DEBUG = False
 
 def kernel_initial(
             σf_initial=1.0,         # covariance amplitude
@@ -252,7 +250,7 @@ class Robot(object): # python (x,y) therefore col index first, row next
             indices_to_remove = []
             for i, peak in enumerate(self.peaks_cord):
                 for visited_peak in (self.visited_peaks_cord):
-                    if np.linalg.norm(np.array(peak) - np.array(visited_peak)) < 2*FOUND_SOURCE_THRESHOLD:
+                    if np.linalg.norm(np.array(peak) - np.array(visited_peak)) < SRC_MUT_D_THRESHOLD:
                         indices_to_remove.append(i)
                         break
             
@@ -294,12 +292,20 @@ class Robot(object): # python (x,y) therefore col index first, row next
         stepsize = np.linalg.norm( np.array(setpoint)-np.array(self.trajectory[-1]) )
         if DEBUG:
             print("stepsize = ", stepsize)
-        if (not active_sensing) and stepsize < 0.1 and np.linalg.norm(ctrl) < 0.1: # get stuck at none sources area 
+        if (not active_sensing) and stepsize < 0.1: # get stuck at none sources area 
+        # if (not active_sensing) and stepsize < 0.1 and np.linalg.norm(ctrl) < CTR_MAG_DETERMIN_STUCK: # get stuck at none sources area 
             if (self.stuck_times >= 2):
-                self.stuck_points.append(self.target)
+                self.stuck_points.append(setpoint)
+                if DEBUG:
+                    print("The stuck point is: ", self.stuck_points)
                 self.stuck_times = 0
             else:
+                if DEBUG:
+                    print("SLOW! with step size", stepsize)
                 self.stuck_times += 1
+        else:
+            self.stuck_times = 0
+            
         self.trajectory = self.trajectory + setpoint
         setpoint = np.array(setpoint)
         

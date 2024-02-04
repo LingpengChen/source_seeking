@@ -7,15 +7,15 @@ class DoubleIntegrator(object):
 
         self.observation_space = Box(np.array([0., 0., -np.inf, -np.inf]),
                                     np.array([1.0, 1.0, np.inf, np.inf]),
-                                    dtype=np.float32)
+                                    dtype=np.float64)
 
         self.action_space = Box(np.array([-2., -2.]),
                                     np.array([2.0, 2.0]),
-                                    dtype=np.float32)
+                                    dtype=np.float64)
 
         self.explr_space = Box(np.array([0., 0.]),
                                     np.array([1.0, 1.0]),
-                                    dtype=np.float32)
+                                    dtype=np.float64)
 
         self.explr_idx  = [0, 1]
 

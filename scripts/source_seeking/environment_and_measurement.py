@@ -3,30 +3,37 @@ from scipy.stats import multivariate_normal
 import numpy as np
 from matplotlib import pyplot as plt
 
+DEBUG = False
 FIELD_SIZE = [10, 10]
 
-FOUND_SOURCE_THRESHOLD = 0.3 # to distinguish whether this is one source or two source
-LCB_THRESHOLD = 0.10 # determine to seek which peak 
+CAM_FOV = 0.4 # to distinguish whether this is one source or two source
+SRC_MUT_D_THRESHOLD = 1
+
+LCB_THRESHOLD = 0.09  
 FIELD_SIZE_X = 10
 FIELD_SIZE_Y = 10
 
-CTR_MAG_DETERMIN_STUCK = 0.05
-STUCK_PTS_THRESHOLD = 0.05 # distance between estimated peak and stuck pts, smaller than this threshold are considered as the same stuck pt
+CTR_MAG_DETERMIN_STUCK = 0.15
+STUCK_PTS_THRESHOLD = 0.1 # smaller than this threshold are considered as the same stuck pt
 
 SOURCES_case = np.array([[[2,6], [8,7],[8,2], [5,6], [3,2]],  # 0
-[[3.0, 4.5], [6.5, 2.5], [2.5, 9.0], [5.5, 7.0], [8.0, 8.5]] ,
-[[8.0, 1.5], [2.5, 5.5], [7.5, 5.5], [4.5, 1.0], [6.0, 8.0]] , 
-[[8.0, 9.0], [6.0, 5.5], [6.0, 1.5], [1.0, 1.0], [1.5, 4.0]] , #3
-[[4.0, 8.5], [3.5, 1.5], [5.5, 4.0], [2.0, 5.0], [8.5, 1.0]] ,
+[[3.0, 4.5], [6.5, 2.5], [2.5, 8.0], [5.5, 7.0], [8.0, 8.5]] ,
+[[8.0, 2.5], [2.5, 5.5], [7.5, 5.5], [4.5, 2.0], [6.0, 8.0]] , 
+[[8.0, 9.0], [6.0, 5.5], [6.0, 2.5], [2.0, 2.0], [3.5, 8.0]] , #3
+[[4.0, 8.5], [3.5, 2.0], [7.5, 7.0], [2.0, 5.0], [8.5, 2.0]] ,
 [[6.0, 4.5], [3.5, 2.0], [7.0, 8.5], [2.5, 7.0], [9.0, 3.5]] , 
-[[4.5, 2.0], [9.0, 7.0], [7.5, 3.5], [5.5, 7.0], [2.0, 6.0]] , #6
-[[3.0, 7.0], [5.5, 2.0], [9.0, 4.0], [6.0, 6.0], [7.5, 9.0]] ,
-[[4.5, 6.0], [1.5, 4.0], [8.0, 7.5], [7.5, 2.0], [4.0, 9.0]] , 
-[[5.5, 6.0], [2.5, 3.0], [6.5, 1.5], [3.5, 9.0], [8.5, 5.0]] , #9
-[[5.0, 6.5], [2.0, 3.5], [8.0, 9], [2.0, 8.0], [5.0, 1.5]] ,
-                         [[2,6], [8,7],[8,2], [5,8], [3,2]], #11
+[[3.0, 7.0], [3.5, 3.0], [9.0, 4.0], [6.0, 6.0], [7.5, 9.0]] , #6
+[[4.5, 6.0], [2.5, 4.0], [8.0, 7.5], [7.5, 2.0], [4.0, 9.0]] , 
+[[5.5, 6.0], [2.5, 3.0], [6.5, 2.0], [3.5, 9.0], [8.5, 5.0]] , 
+[[5.0, 6.5], [2.0, 3.5], [8.0, 9.0], [2.0, 8.0], [5.0, 2.5]] ,   #9
+                        #  [[2,6], [8,7],[8,2], [5,8], [3,2]], #11
+# [[4.5, 2.0], [9.0, 7.0], [7.5, 3.5], [5.5, 7.0], [2.0, 6.0]] , #6
 ])
 
+ROBOT_INIT_LOCATIONS_case = [[[1,2], [2, 2], [3,1]],
+                            [[1,8], [2, 8], [3,9]],
+                            [[9,8], [8, 8], [7,9]],
+                            [[9,2], [8, 2], [7,1]]]
 
 class Environment():    # class for robot to interact with the environment
     def __init__(self, source_case_index):
@@ -59,13 +66,12 @@ class Environment():    # class for robot to interact with the environment
 
     def find_source(self, setpoint):
         for coord in self.SOURCES:
-            if np.linalg.norm(coord - setpoint) < FOUND_SOURCE_THRESHOLD:
+            if np.linalg.norm(coord - setpoint) < CAM_FOV:
                 return coord
         return None
 
 
 if __name__ == '__main__':
-    print(SOURCE_VALUE)
     # source_value = sampling(SOURCE)
     FIELD_SIZE_X = 10
     FIELD_SIZE_Y = 10
@@ -78,12 +84,13 @@ if __name__ == '__main__':
     X_test = np.vstack(np.dstack((X_test_xx, X_test_yy)))
 
     for i, sources in enumerate(SOURCES_case):
-        f = get_f(sources)
+        env = Environment(i)
+
         plt.title(f"Topology {i}:")
 
         # 设置图像的长宽比为一致
         plt.gca().set_aspect('equal', adjustable='box')
 
-        plt.contourf(X_test_xx, X_test_yy, f(X_test).reshape(test_resolution))
+        plt.contourf(X_test_xx, X_test_yy, env.f(X_test).reshape(test_resolution))
         plt.show()
     

@@ -1,5 +1,11 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+import warnings
+warnings.filterwarnings("ignore")
+
 import numpy as np
 np.random.seed(10)
+import sys
 
 from matplotlib import pyplot as plt
 import matplotlib.gridspec as gridspec
@@ -11,14 +17,13 @@ from scipy.spatial import Voronoi, voronoi_plot_2d
 from robot import Robot
 
 ## Initilize environment
-from environment_and_measurement import Environment   
+from environment_and_measurement import Environment, ROBOT_INIT_LOCATIONS_case, DEBUG  
 from IPython.display import clear_output
 
 import argparse
 
 COLORS = ['blue', 'green', 'red', 'purple', 'orange', 'black']  
 
-DEBUG = False
 
 def unique_list(redundant_list):
     tuple_list = [tuple(list(item)) for item in redundant_list]
@@ -109,10 +114,13 @@ def experiment():
                 if target:
                     targets.append(target)
         
+        ## basic info
         if DEBUG:
             print(iteration)
             print(found_source_set)
-            print("=====================")    
+            print("=====================")   
+        else:
+            print_progress_bar(experiment_case, iteration)
         
     ####################################################################
         
@@ -126,7 +134,9 @@ def experiment():
         
     ## Visualize
         # if iteration == 40 or (iteration >= 45 and iteration % 5 == 0 and SHOWN) or end:
-        if DEBUG or end:
+        debug_print = DEBUG and (iteration == 0 or (iteration >= 50 and iteration % 3 == 0))
+       
+        if debug_print or end:
             sizes = 5  # 可以是一个数字或者一个长度为N的数组，表示每个点的大小              
             # # 设置图表的总大小
             fig, axs = plt.subplots(1, 5, figsize=(24, 10), subplot_kw={'projection': '3d'})
@@ -149,7 +159,7 @@ def experiment():
                 for i in range(robo_num):
                     color = COLORS[i % len(COLORS)]
                     trajectory = np.array(Robots[i].trajectory)
-                    axs[0].plot(trajectory[:, 0], trajectory[:, 1], color=color, zorder=1)  # 设置线条颜色
+                    axs[0].plot(trajectory[:, 0], trajectory[:, 1], color=color, zorder=1)  
                     axs[0].scatter(trajectory[:, 0], trajectory[:, 1],s=sizes, c=color, zorder=2)
 
                 # 1-3) sources ground truth
@@ -198,11 +208,7 @@ def experiment():
             
             surf5 = axs[4].plot_surface(X_test_xx, X_test_yy, ucb_changed, cmap='viridis', edgecolor='k', linewidth=0.5)
             fig.colorbar(surf5, ax=axs[4], pad=0.2, shrink=0.4)
-            # zmin = 0  # 设置 z 轴的最小值
-            # zmax = 0.3  # 设置 z 轴的最大值
-            # axs[3].set_zlim([zmin, zmax])
 
-            # 设置标签和标题 
             axs[0].set_xlabel('X Label')
             axs[0].set_ylabel('Y Label')
             axs[0].set_title('Trajectory')
@@ -226,7 +232,8 @@ def experiment():
             axs[4].set_ylabel('Y Label')
             axs[4].set_zlabel('Z Label')
             axs[4].set_title('UCB_changed')
-            # plt.show()
+            if debug_print:
+                plt.show()
             # if iteration == 2:
             if end:
                 plt.savefig(save_img_path)
@@ -238,6 +245,12 @@ def experiment():
 
     print("Experiment_", experiment_case, "Finished!")
 
+def print_progress_bar(index, iteration):
+    position = index+1
+    sys.stdout.write(f'\033[{position}B\r')  # Move to correct position
+    sys.stdout.write(f'Case {index}: {iteration}\033[{position}A\r')  # Print progress bar and move back up
+    sys.stdout.flush()
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -245,8 +258,13 @@ if __name__ == '__main__':
     # parser.add_argument('source_index', type=int, help='choose the sources topology you want',  nargs='?', default=1)
     args = parser.parse_args()
     experiment_case = args.source_index
-
-    environment = Environment(experiment_case)
+        
+    env_index = int( experiment_case / 4 )
+    robot_ini_loc_index = experiment_case % 4
+    environment = Environment( env_index )
+    
+    robo_num = 3
+    robot_locations = ROBOT_INIT_LOCATIONS_case[robot_ini_loc_index]
 
     save_img_path = "/home/clp/catkin_ws/src/source_seeking/record/experiment_case_" + str(experiment_case) + ".png"
     save_rmse_path = "/home/clp/catkin_ws/src/source_seeking/record/experiment_case_" + str(experiment_case) + ".txt"
@@ -281,9 +299,6 @@ if __name__ == '__main__':
             y_train = environment.sampling(X_train)
     # Set 
     if True:
-        robo_num = 3
-        # robot_locations = [[3,3], [5, 4], [7,3]]
-        robot_locations = [[1,2], [2, 2], [3,1]]
         Robots = []
         for index in range(robo_num):
             # initialize the thread

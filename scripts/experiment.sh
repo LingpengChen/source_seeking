@@ -1,12 +1,15 @@
 #!/bin/bash
 
-# Loop to run source_seeking_main_ES.py with numbers 1 through 11 in parallel
-for i in {1..11}
+# Loop from 1 to 10
+for i in {0..15}
 do
-   echo "python3 ./source_seeking/source_seeking_main_ES.py $i"; python3 ./source_seeking/source_seeking_main_ES.py $i &
+   # Start each python script as a separate background process
+   # python3 ./test.py $i &
+   python3 ./source_seeking/source_seeking_main_ES.py $i &
+   sleep 0.1
 done
 
-# Wait for all background processes to finish
+# Wait for all background processes to complete
 wait
 
 echo "All processes have completed."
