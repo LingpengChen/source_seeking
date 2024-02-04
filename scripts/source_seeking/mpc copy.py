@@ -52,8 +52,8 @@ if __name__ == '__main__':
     robot = DoubleIntegrator()
     mpc = MPCController(robot, horizon=10)
 
-    x0 = np.array([0., 0., 0.5, -0.1])
-    x_target = np.array([1., 1., 0., 0.])
+    x0 = np.array([0.163, 0.429, 0.077, 0.627])
+    x_target = np.array([0.1848, 0.5448])
     trajectory = [x0]
 
     for i in range(30):
@@ -61,9 +61,9 @@ if __name__ == '__main__':
         robot.reset(trajectory[-1])
         x_next = robot.step(u)
         delta = x_next[:2] - x_target[:2]
-        if np.sqrt(np.dot(delta, delta)) < 0.05:
-            print(i)
-            break
+        # if np.sqrt(np.dot(delta, delta)) < 0.05:
+        #     print(i)
+        #     break
         print(u)
         print(robot.state)
         trajectory.append(x_next)
@@ -72,7 +72,7 @@ if __name__ == '__main__':
 
     # Now, you can plot the trajectory
     plt.scatter(trajectory[:, 0], trajectory[:, 1], label='Robot Path', s=10, c='blue')
-    plt.scatter([1], [1], color='red', marker='*', label='Target')
+    plt.scatter(x_target[0], x_target[1], color='red', marker='*', label='Target')
     plt.xlabel('X Position')
     plt.ylabel('Y Position')
     plt.legend()

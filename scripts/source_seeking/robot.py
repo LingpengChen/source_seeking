@@ -1,3 +1,4 @@
+from typing import List 
 import sys
 # sys.path.append('./rt_erg_lib/')
 from double_integrator import DoubleIntegrator
@@ -15,11 +16,13 @@ from scipy.io import loadmat
 import rospy
 from grid_map_msgs.msg import GridMap
 from source_seeking.msg import Ck
-from environment_and_measurement import sampling, find_source, FOUND_SOURCE_THRESHOLD, LCB_THRESHOLD # sampling function is just f with noise
+from environment_and_measurement import Environment
+from environment_and_measurement import FOUND_SOURCE_THRESHOLD, LCB_THRESHOLD, CTR_MAG_DETERMIN_STUCK, STUCK_PTS_THRESHOLD 
 
 from sklearn.gaussian_process import GaussianProcessRegressor
 from sklearn.gaussian_process.kernels import RBF, WhiteKernel
 
+DEBUG = False
 
 def kernel_initial(
             σf_initial=1.0,         # covariance amplitude
@@ -28,9 +31,9 @@ def kernel_initial(
         ):
             return σf_initial**2 * RBF(length_scale=ell_initial, length_scale_bounds=(0.5, 2)) + WhiteKernel(noise_level=σn_initial)
 
-class Controller(object): # python (x,y) therefore col index first, row next
+class Robot(object): # python (x,y) therefore col index first, row next
     # robot state + controller !
-    def __init__(self, start_position, index, test_resolution = [50,50], field_size = [10,10]):
+    def __init__(self, start_position, index, environment: Environment, test_resolution = [50,50]):
         
         ## robot index
         self.index = index
@@ -40,15 +43,16 @@ class Controller(object): # python (x,y) therefore col index first, row next
         # test_resolution
         self.test_resolution = test_resolution # [50, 50]
         # real size
-        self.field_size = field_size # [10, 10]
+        self.environment = environment
+        self.field_size = self.environment.field_size
         
         # for ES
         grid_2_r_w = np.meshgrid(np.linspace(0, 1, int(test_resolution[0])), np.linspace(0, 1, int(test_resolution[1])))
         self.grid = np.c_[grid_2_r_w[0].ravel(), grid_2_r_w[1].ravel()] # (2500,2)
 
         # for gp
-        X_test_x = np.linspace(0, field_size[0], test_resolution[0])
-        X_test_y = np.linspace(0, field_size[1], test_resolution[1])
+        X_test_x = np.linspace(0, self.field_size[0], test_resolution[0])
+        X_test_y = np.linspace(0, self.field_size[1], test_resolution[1])
         X_test_xx, X_test_yy = np.meshgrid(X_test_x, X_test_y)
         self.X_test = np.vstack(np.dstack((X_test_xx, X_test_yy))) # (2500,2)
         
@@ -63,15 +67,15 @@ class Controller(object): # python (x,y) therefore col index first, row next
         self.Mpc_ctrl    = MPCController(DoubleIntegrator(), horizon=10, Q=1, R=0.01)
         # samples 
         self.samples_X = np.array([start_position])
-        self.samples_Y = np.array(sampling([start_position]))
+        self.samples_Y = np.array(self.environment.sampling([start_position]))
         
         self.trajectory = [start_position]
         
         ## ROBOT neigibours
         self.neighbour = None  
         self.responsible_region = np.zeros(self.test_resolution)
-        
-        print("Controller Succcessfully Initialized! Initial position is: ", start_position)
+        if DEBUG:
+            print("Controller Succcessfully Initialized! Initial position is: ", start_position)
         self.sent_samples = []
         
         ## GP
@@ -84,7 +88,12 @@ class Controller(object): # python (x,y) therefore col index first, row next
         self.peaks_cord = None
         self.peaks_LCB = None
         self.visited_peaks_cord = []
-        ## 
+        self.stuck_points = []
+        self.stuck_times = 0
+        ## MI
+        self.gamma_gp = 0
+        
+        self.target = None
     
     def receive_prior_knowledge(self, X_train=None, y_train=None):
         if X_train is not None:
@@ -156,30 +165,33 @@ class Controller(object): # python (x,y) therefore col index first, row next
             self.samples_Y = np.concatenate((self.samples_Y, exchanged_samples_y), axis=0)
     
     # step 2 calcualte GP
-    def gp_regresssion(self, ucb_coeff=2): # the X_train, y_train is only for the prior knowledge
+    def gp_learn_and_get_acquisition(self, ucb_coeff=2): # the X_train, y_train is only for the prior knowledge
         # # 找到 samples_X 中重复元素的索引
         # 根据这些索引保留 samples_X 和 samples_Y 中的非重复元素
         _, unique_indices = np.unique(self.samples_X, axis=0, return_index=True)
         self.samples_X = self.samples_X[unique_indices]
         self.samples_Y = self.samples_Y[unique_indices]      
         self.gp.fit(self.samples_X, self.samples_Y)
+        # Bayesian inference
         μ_test, σ_test = self.gp.predict(self.X_test, return_std=True)
         
-        
-        
-        ucb = μ_test + ucb_coeff*σ_test
         self.estimation = μ_test.reshape(self.test_resolution)
         self.variance = σ_test.reshape(self.test_resolution)
-
         
-        ucb = ucb.reshape(self.test_resolution)
+        # update gamma based on variance of xt from the last iteration, i.e., gama_t-1
+        if len(self.trajectory) > 1:
+            _, variance = self.gp.predict([self.trajectory[-1]], return_std=True)
+            self.gamma_gp += variance
         
-        # calculate phik based on ucb
-        self.phik = convert_phi2phik(self.Erg_ctrl.basis, ucb, self.grid)
+        # definition of phi_t(x) for all x
+        mutual_info_dist = μ_test + ucb_coeff * (np.sqrt(σ_test + self.gamma_gp) - np.sqrt(self.gamma_gp))
+        self.gp_mi = mutual_info_dist.reshape(self.test_resolution)
+        
+         # calculate phik based on MI
+        self.phik = convert_phi2phik(self.Erg_ctrl.basis, self.gp_mi, self.grid)
         phi = convert_phik2phi(self.Erg_ctrl.basis, self.phik , self.grid)
-
-        self.estimate_source(lcb_coeff=2)
-        return self.estimation*self.responsible_region, ucb
+        
+        return self.estimation*self.responsible_region, self.gp_mi*self.responsible_region
     
     # step 3 exchange phik ck visted source
     def send_out_phik(self):
@@ -218,9 +230,9 @@ class Controller(object): # python (x,y) therefore col index first, row next
         self.visited_peaks_cord = peaks
         
     # step 4 move will ergodic control
-    def get_nextpts(self, phi_vals=None, control_mode="ES_NORMAL"):
+    def get_nextpts(self, phi_vals=None, control_mode="NORMAL"):
         ctrl = None
-        target = None
+        self.target = None
         active_sensing = True   
         if control_mode == "ES_UNIFORM":
             # setting the phik on the ergodic controller    
@@ -229,7 +241,7 @@ class Controller(object): # python (x,y) therefore col index first, row next
             self.Erg_ctrl.phik = convert_phi2phik(self.Erg_ctrl.basis, phi_vals, self.grid)
             ctrl = self.Erg_ctrl(self.robot_state)
            
-        elif control_mode == "ES_NORMAL":
+        elif control_mode == "NORMAL":
             if phi_vals is not None:
                 phi_vals /= np.sum(phi_vals)
                 self.Erg_ctrl.phik = convert_phi2phik(self.Erg_ctrl.basis, phi_vals, self.grid)
@@ -239,48 +251,71 @@ class Controller(object): # python (x,y) therefore col index first, row next
             # remove the peak that has already been visited
             indices_to_remove = []
             for i, peak in enumerate(self.peaks_cord):
-                for visited_peak in self.visited_peaks_cord:
+                for visited_peak in (self.visited_peaks_cord):
                     if np.linalg.norm(np.array(peak) - np.array(visited_peak)) < 2*FOUND_SOURCE_THRESHOLD:
                         indices_to_remove.append(i)
                         break
-
+            
+            # remove the peak that has already been visited
+            for i, peak in enumerate(self.peaks_cord):
+                for stuck_pts in (self.stuck_points):
+                    if np.linalg.norm(np.array(peak) - np.array(stuck_pts)) < STUCK_PTS_THRESHOLD:
+                        indices_to_remove.append(i)
+                        break
+            
+            # all potential peaks that haven't been visited
             peaks_cord = [peak for i, peak in enumerate(self.peaks_cord) if i not in indices_to_remove]
             peaks_LCB = [lcb for i, lcb in enumerate(self.peaks_LCB) if i not in indices_to_remove]
             
-            if peaks_LCB and np.max(peaks_LCB) > LCB_THRESHOLD:   # determine to seek which peak   
+            # determine whether there is a peak of good confidence   
+            if peaks_LCB and np.max(peaks_LCB) > LCB_THRESHOLD:   
                 index = np.argmax(peaks_LCB)
                 distance = cdist([self.trajectory[-1]], [peaks_cord[index]])[0][0]
-                target = peaks_cord[index]
+                self.target = peaks_cord[index]
                 active_sensing = False
-
+            
+            # calculate control command
             if active_sensing:
                 ctrl = self.Erg_ctrl(self.robot_state)
-                print("ES: ", np.linalg.norm(ctrl))
+                if DEBUG:
+                    print("ES: ", np.linalg.norm(ctrl))
                 
             else: # source seeking
-                self.Erg_ctrl.update_trajectory(self.robot_state)
-                ctrl_target = np.array(target) / self.field_size[0]
+                self.Erg_ctrl.update_trajectory(self.robot_state) # update ck
+                ctrl_target = np.array(self.target) / self.field_size[0]
                 ctrl = self.Mpc_ctrl(self.robot_state, ctrl_target)
-                print("mpc: ", np.linalg.norm(ctrl), "with target: ", target)
-       
+                if DEBUG:
+                    print("mpc: ", np.linalg.norm(ctrl), "with target: ", self.target)
+
+        # move based on ctrl command
         self.robot_state = self.robot_dynamic.step(ctrl)         
         setpoint = [[ self.field_size[0]*self.robot_state[0], self.field_size[1]*self.robot_state[1] ]]
-       
+
+        stepsize = np.linalg.norm( np.array(setpoint)-np.array(self.trajectory[-1]) )
+        if DEBUG:
+            print("stepsize = ", stepsize)
+        if (not active_sensing) and stepsize < 0.1 and np.linalg.norm(ctrl) < 0.1: # get stuck at none sources area 
+            if (self.stuck_times >= 2):
+                self.stuck_points.append(self.target)
+                self.stuck_times = 0
+            else:
+                self.stuck_times += 1
         self.trajectory = self.trajectory + setpoint
         setpoint = np.array(setpoint)
         
         # determine whether the source is found
-        source_cord = find_source(setpoint, FOUND_SOURCE_THRESHOLD)
-        if not active_sensing and source_cord is not None:
-            print("source", source_cord, "is found by Robot ", self.index, "!", "The target is ", target)
+        # some special sensors here (maybe camera here to determine whether a source is found)
+        source_cord = self.environment.find_source(setpoint)
+        if source_cord is not None:
+            if DEBUG:
+                print("source", source_cord, "is found by Robot ", self.index, "!", "The target is ", self.target)
             self.visited_peaks_cord.append(list(source_cord))
 
+        # take samples and add to local dataset
         self.samples_X = np.concatenate((self.samples_X, setpoint), axis=0)
-        self.samples_Y = np.concatenate((self.samples_Y, sampling(setpoint)), axis=0)
-        
+        self.samples_Y = np.concatenate((self.samples_Y, self.environment.sampling(setpoint)), axis=0)
         
         return setpoint
-    
     
     # Tools
     def get_trajectory(self):
@@ -323,10 +358,7 @@ class Controller(object): # python (x,y) therefore col index first, row next
                     self.peaks_LCB.append(LCB)
                     self.peaks_cord.append(peak)
                 i+=1
-
             
         return self.peaks_cord, self.peaks_LCB
     
-    def get_estimated_source(self):
-        return self.peaks_cord, self.peaks_LCB 
     

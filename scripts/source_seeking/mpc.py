@@ -4,7 +4,7 @@ from double_integrator import DoubleIntegrator
 import matplotlib.pyplot as plt
 
 class MPCController:
-    def __init__(self, model, horizon=10, Q=1, R=0.01):
+    def __init__(self, model, horizon=5, Q=1, R=0.01):
         self.model = model
         self.horizon = horizon
         self.u = cp.Variable((2, horizon))
@@ -34,7 +34,7 @@ class MPCController:
             cost += cp.quad_form(self.u[:, t], self.R)
             
             constraints += [self.x[:, t+1] == self.x[:, t] + (self.model.A @ self.x[:, t] + self.model.B @ self.u[:, t]) * self.dt]
-            constraints += [((self.model.A @ self.x[:, t] + self.model.B @ self.u[:, t]) * self.dt) <= 0.05]
+            # constraints += [((self.model.A @ self.x[:, t] + self.model.B @ self.u[:, t]) * self.dt) <= 0.1]
             constraints += [cp.norm(self.u[:, t], 2) <= 1]
             
         constraints += [self.x[:, 0] == x0]
@@ -52,8 +52,8 @@ if __name__ == '__main__':
     robot = DoubleIntegrator()
     mpc = MPCController(robot, horizon=10)
 
-    x0 = np.array([0., 0., 0.5, -0.1])
-    x_target = np.array([1., 1., 0., 0.])
+    x0 = np.array([0.163, 0.429, 0.077, 0.627])
+    x_target = np.array([0.2848, 0.5448, 0 ,0])
     trajectory = [x0]
 
     for i in range(30):
@@ -61,9 +61,9 @@ if __name__ == '__main__':
         robot.reset(trajectory[-1])
         x_next = robot.step(u)
         delta = x_next[:2] - x_target[:2]
-        if np.sqrt(np.dot(delta, delta)) < 0.05:
-            print(i)
-            break
+        # if np.sqrt(np.dot(delta, delta)) < 0.05:
+        #     print(i)
+        #     break
         print(u)
         print(robot.state)
         trajectory.append(x_next)
@@ -72,7 +72,7 @@ if __name__ == '__main__':
 
     # Now, you can plot the trajectory
     plt.scatter(trajectory[:, 0], trajectory[:, 1], label='Robot Path', s=10, c='blue')
-    plt.scatter([1], [1], color='red', marker='*', label='Target')
+    plt.scatter(x_target[0], x_target[1], color='red', marker='*', label='Target')
     plt.xlabel('X Position')
     plt.ylabel('Y Position')
     plt.legend()

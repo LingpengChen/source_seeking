@@ -185,6 +185,7 @@ class Controller(object): # python (x,y) therefore col index first, row next
         
         # selection of the next query location through argmax
         self.estimate_source(lcb_coeff)
+        
         return self.estimation*self.responsible_region, self.gp_mi*self.responsible_region
         
     # step 3 exchange phik ck visted source
@@ -253,7 +254,7 @@ class Controller(object): # python (x,y) therefore col index first, row next
             peaks_cord = [peak for i, peak in enumerate(self.peaks_cord) if i not in indices_to_remove]
             peaks_LCB = [lcb for i, lcb in enumerate(self.peaks_LCB) if i not in indices_to_remove]
             
-            if peaks_LCB and np.max(peaks_LCB) > LCB_THRESHOLD:   # determine to seek which peak   
+            if peaks_LCB and np.max(peaks_LCB) > LCB_THRESHOLD:   
                 index = np.argmax(peaks_LCB)
                 distance = cdist([self.trajectory[-1]], [peaks_cord[index]])[0][0]
                 target = peaks_cord[index]

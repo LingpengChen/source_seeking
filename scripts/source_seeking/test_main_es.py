@@ -10,10 +10,11 @@ import numpy as np
 from scipy.io import loadmat
 
 import matplotlib.pyplot as plt
-from environment_and_measurement import f
+# from environment_and_measurement import f
 
 import os
 
+f = lambda x: source1.pdf(x) + 1.05*source2.pdf(x) + source3.pdf(x) + 1.1*source4.pdf(x) + source5.pdf(x)
 if __name__ == '__main__':
     env         = DoubleIntegrator() # robot controller system
     model       = DoubleIntegrator()
@@ -24,7 +25,8 @@ if __name__ == '__main__':
     X_test_y = np.linspace(x_min[1], x_max[1], test_resolution[1])
     X_test_xx, X_test_yy = np.meshgrid(X_test_x, X_test_y)
     grid_2_r_w = np.meshgrid(np.linspace(0, 1, int(test_resolution[0])), np.linspace(0, 1, int(test_resolution[1])))
-    grid_vals = f(np.vstack(np.dstack((X_test_xx, X_test_yy)))).reshape(50,50)
+    # grid_vals = f(np.vstack(np.dstack((X_test_xx, X_test_yy)))).reshape(50,50)
+    grid_vals = 10*np.ones((50,50))
     grid = np.c_[grid_2_r_w[0].ravel(), grid_2_r_w[1].ravel()] #(2500,2)
     
     # original normalized image
@@ -39,10 +41,10 @@ if __name__ == '__main__':
     
     # setting the phik on the ergodic controller
     erg_ctrl.phik = convert_phi2phik(erg_ctrl.basis, grid_vals, grid)
-    print("first phik", np.mean(erg_ctrl.phik))   
+
     print('--- simulating ergodic coverage ---')
     log = {'trajectory' : []}
-    tf = 100                                                                                                                                                                                       
+    tf = 200                                                                                                                                                                                       
     state = env.reset()
 
     plt.figure(1)
@@ -71,23 +73,24 @@ if __name__ == '__main__':
     path = xt[:tf,model.explr_idx]
     ck = convert_traj2ck(erg_ctrl.basis, path) # coeffieient 25
     val = convert_ck2dist(erg_ctrl.basis, ck, grid) 
-    print(np.sum(val))
     
-    # plt.title('time averaged statistics')
-    # plt.imshow(val.reshape(50,50), cmap='viridis')
-    # plt.colorbar()
-    # plt.show()
-    # # plt.figure(2)
-    # # x = range(len(Erg_list))
+    plt.title('time averaged statistics')
+    plt.imshow(val.reshape(50,50), cmap='viridis')
+    plt.colorbar()
+    plt.show()
+    
+    plt.figure(2)
+    x = range(len(Erg_list))
+    plt.plot(x, Erg_list, marker='o', linestyle='-', color='b')
 
-    # # plt.plot(x, Erg_list, marker='o', linestyle='-', color='b')
+    plt.title('Erg_metric')
+    plt.xlabel('time')
+    plt.ylabel('metric value')
+    plt.show()
 
-    # plt.title('Erg_metric')
-    # plt.xlabel('time')
-    # plt.ylabel('metric value')
-
-    # plt.title('Fourier reconstruction of target distribution')
-    # phi = convert_phik2phi(erg_ctrl.basis, erg_ctrl.phik, t_dist.grid)
-    # plt.contourf(*xy, phi.reshape(40,20), levels=10)
+    plt.figure(3)
+    plt.title('Fourier reconstruction of target distribution')
+    phi_conv = convert_phik2phi(erg_ctrl.basis, erg_ctrl.phik, grid)
+    plt.imshow(phi_conv.reshape(50,50), cmap='viridis')
 
     plt.show()
