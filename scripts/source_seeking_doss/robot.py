@@ -85,9 +85,6 @@ class Robot(object): # python (x,y) therefore col index first, row next
         self.variance = None
         self.peaks_cord = None
         self.peaks_LCB = None
-        self.LCB_THRESHOLD = LCB_THRESHOLD
-        self.iteration = 0
-        
         self.visited_peaks_cord = []
         self.stuck_points = []
         self.stuck_times = 0
@@ -232,7 +229,6 @@ class Robot(object): # python (x,y) therefore col index first, row next
         
     # step 4 move will ergodic control
     def get_nextpts(self, phi_vals=None, control_mode="NORMAL"):
-        self.iteration += 1
         ctrl = None
         self.target = None
         active_sensing = True   
@@ -269,9 +265,8 @@ class Robot(object): # python (x,y) therefore col index first, row next
             peaks_cord = [peak for i, peak in enumerate(self.peaks_cord) if i not in indices_to_remove]
             peaks_LCB = [lcb for i, lcb in enumerate(self.peaks_LCB) if i not in indices_to_remove]
             
-            # determine whether there is a peak of good confidence  
-            lcb_value = self.LCB_THRESHOLD - 0.002*self.iteration
-            if peaks_LCB and np.max(peaks_LCB) > lcb_value:   
+            # determine whether there is a peak of good confidence   
+            if peaks_LCB and np.max(peaks_LCB) > LCB_THRESHOLD:   
                 index = np.argmax(peaks_LCB)
                 distance = cdist([self.trajectory[-1]], [peaks_cord[index]])[0][0]
                 self.target = peaks_cord[index]
@@ -317,7 +312,7 @@ class Robot(object): # python (x,y) therefore col index first, row next
         # determine whether the source is found
         # some special sensors here (maybe camera here to determine whether a source is found)
         source_cord = self.environment.find_source(setpoint)
-        if (source_cord is not None) and (self.target is not None):
+        if source_cord is not None:
             if DEBUG:
                 print("source", source_cord, "is found by Robot ", self.index, "!", "The target is ", self.target)
             self.visited_peaks_cord.append(list(source_cord))

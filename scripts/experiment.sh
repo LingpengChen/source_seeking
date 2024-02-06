@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Loop from 1 to 10
-for i in {0..15}
+for i in {28..31}
 do
    # Start each python script as a separate background process
    # python3 ./test.py $i &

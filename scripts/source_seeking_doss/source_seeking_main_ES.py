@@ -134,7 +134,7 @@ def experiment():
         
     ## Visualize
         # if iteration == 40 or (iteration >= 45 and iteration % 5 == 0 and SHOWN) or end:
-        debug_print = DEBUG and (iteration == 5 or (iteration >= 10 and iteration % 5 == 0))
+        debug_print = DEBUG and (iteration == 0 or (iteration >= 50 and iteration % 3 == 0))
        
         if debug_print or end:
             sizes = 5  # 可以是一个数字或者一个长度为N的数组，表示每个点的大小              
@@ -246,7 +246,7 @@ def experiment():
     print("Experiment_", experiment_case, "Finished!")
 
 def print_progress_bar(index, iteration):
-    position = index%4+1
+    position = index+1
     sys.stdout.write(f'\033[{position}B\r')  # Move to correct position
     sys.stdout.write(f'Case {index}: {iteration}\033[{position}A\r')  # Print progress bar and move back up
     sys.stdout.flush()
