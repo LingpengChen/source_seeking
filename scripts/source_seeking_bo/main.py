@@ -1,23 +1,19 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 import warnings
 warnings.filterwarnings("ignore")
 
 import numpy as np
 np.random.seed(10)
 import sys
-
 from matplotlib import pyplot as plt
-import matplotlib.gridspec as gridspec
 
-from utils import find_peak, calculate_wrmse
-from vonoroi_utils import voronoi_neighbours
+from utils.analysis_utils import calculate_wrmse
+from utils.vonoroi_utils import voronoi_neighbours
 from scipy.spatial import Voronoi, voronoi_plot_2d
 
 from robot import Robot
 
 ## Initilize environment
-from environment_and_measurement import Environment, ROBOT_INIT_LOCATIONS_case, DEBUG  
+from environment.environment_and_measurement import Environment, ROBOT_INIT_LOCATIONS_case, DEBUG  
 from IPython.display import clear_output
 
 import argparse
@@ -68,6 +64,7 @@ def experiment():
                     Robots[i].receive_samples(exchange_dictionary_X[i], exchange_dictionary_y[i])
         
         ## 2. train and estimate!
+        # μ_estimation and ucb here is just for plot and debug
         μ_estimation = np.zeros(test_resolution)
         ucb = np.zeros(test_resolution)
         peaks = []
@@ -98,7 +95,8 @@ def experiment():
                 Robots[i].receive_source_cord(found_source)
                 ucb_changed = Robots[i].receive_phik_consensus(phik_pack.copy()) 
         
-        # determine whether all the source have been found
+        # determine whether all the source have been found, we assume that the number of sources is known
+        # if true, we stop the experiment
         found_source_set = {tuple(item) for item in found_source}
         if found_source_set == environment.SOURCE_SET:
             end = True
@@ -254,7 +252,7 @@ def print_progress_bar(index, iteration):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('source_index', type=int, help='choose the sources topology you want')
+    parser.add_argument('source_index', type=int, help='choose the sources topology you want', nargs='?', default=1)
     # parser.add_argument('source_index', type=int, help='choose the sources topology you want',  nargs='?', default=1)
     args = parser.parse_args()
     experiment_case = args.source_index
@@ -266,8 +264,8 @@ if __name__ == '__main__':
     robo_num = 3
     robot_locations = ROBOT_INIT_LOCATIONS_case[robot_ini_loc_index]
 
-    save_img_path = "/home/clp/catkin_ws/src/source_seeking/record/proposed_method/experiment_case_" + str(experiment_case) + ".png"
-    save_rmse_path = "/home/clp/catkin_ws/src/source_seeking/record/proposed_method/experiment_case_" + str(experiment_case) + ".txt"
+    save_img_path = "/home/clp/catkin_ws/src/source_seeking/record/comparation_test/experiment_case_" + str(experiment_case) + ".png"
+    save_rmse_path = "/home/clp/catkin_ws/src/source_seeking/record/comparation_test/experiment_case_" + str(experiment_case) + ".txt"
 
     #############################################################
     ## Define the source field
