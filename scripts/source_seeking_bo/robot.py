@@ -1,6 +1,3 @@
-from typing import List 
-import sys
-# sys.path.append('./rt_erg_lib/')
 from controller.double_integrator import DoubleIntegrator
 from controller.ergodic_control import RTErgodicControl
 from controller.mpc import MPCController
@@ -52,7 +49,7 @@ def kernel_initial(
             return σf_initial**2 * RBF(length_scale=ell_initial, length_scale_bounds=(0.5, 2)) + WhiteKernel(noise_level=σn_initial)
 
 class Robot(object): # python (x,y) therefore col index first, row next
-    # robot state + controller !
+    # robot state + controller initialization!
     def __init__(self, start_position, index, environment: Environment, test_resolution = [50,50]):
         
         ## robot index

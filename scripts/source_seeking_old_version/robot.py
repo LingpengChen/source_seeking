@@ -1,45 +1,26 @@
-from controller.double_integrator import DoubleIntegrator
-from controller.ergodic_control import RTErgodicControl
-from controller.mpc import MPCController
+from typing import List 
+import sys
+# sys.path.append('./rt_erg_lib/')
+from double_integrator import DoubleIntegrator
+from ergodic_control import RTErgodicControl
+from mpc import MPCController
+from target_dist import TargetDist
 from scipy.spatial.distance import cdist
-from scipy.spatial import distance
+from scipy.spatial import Voronoi, distance
 
-from controller.utils import convert_phi2phik, convert_phik2phi
+from utils import convert_phi2phik, convert_ck2dist, convert_traj2ck, convert_phik2phi, find_peak
 import numpy as np
+from scipy.io import loadmat
 
-from environment.environment_and_measurement import Environment, DEBUG
-from environment.environment_and_measurement import CAM_FOV, SRC_MUT_D_THRESHOLD, LCB_THRESHOLD, STUCK_PTS_THRESHOLD 
+import rospy
+from grid_map_msgs.msg import GridMap
+from source_seeking.msg import Ck
+from environment_and_measurement import Environment, DEBUG
+from environment_and_measurement import CAM_FOV, SRC_MUT_D_THRESHOLD, LCB_THRESHOLD, CTR_MAG_DETERMIN_STUCK, STUCK_PTS_THRESHOLD 
 
 from sklearn.gaussian_process import GaussianProcessRegressor
 from sklearn.gaussian_process.kernels import RBF, WhiteKernel
 
-from scipy.ndimage import maximum_filter
-
-def find_peak(matrix, strict=True):
-    
-    # 使用最大滤波器找到每个位置的局部最大值
-    local_max = maximum_filter(matrix, size=3) == matrix # [[F F][T F]]
-    
-    # 获取局部最大值的坐标
-    local_maxima_coords = np.argwhere(local_max)
-    
-    if strict:
-        # 过滤出严格大于其周围邻居的局部最大值
-        strict_local_maxima = []
-        for i, j in local_maxima_coords:
-            if i > 0 and j > 0 and i < matrix.shape[0] - 1 and j < matrix.shape[1] - 1:
-                neighbors = [matrix[i-1, j-1], matrix[i-1, j], matrix[i-1, j+1],
-                            matrix[i, j-1],                 matrix[i, j+1],
-                            matrix[i+1, j-1], matrix[i+1, j], matrix[i+1, j+1]]
-                if all(matrix[i, j] > neighbor for neighbor in neighbors):
-                    strict_local_maxima.append([i,j])
-        if (len(strict_local_maxima)):
-            return np.array(strict_local_maxima)[:, [1, 0]]
-        else:
-            return strict_local_maxima
-
-    else:
-        return local_maxima_coords[:, [1, 0]]
 
 def kernel_initial(
             σf_initial=1.0,         # covariance amplitude
@@ -49,7 +30,7 @@ def kernel_initial(
             return σf_initial**2 * RBF(length_scale=ell_initial, length_scale_bounds=(0.5, 2)) + WhiteKernel(noise_level=σn_initial)
 
 class Robot(object): # python (x,y) therefore col index first, row next
-    # robot state + controller initialization!
+    # robot state + controller !
     def __init__(self, start_position, index, environment: Environment, test_resolution = [50,50]):
         
         ## robot index
