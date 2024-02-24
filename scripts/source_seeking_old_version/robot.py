@@ -12,7 +12,6 @@ from utils import convert_phi2phik, convert_ck2dist, convert_traj2ck, convert_ph
 import numpy as np
 from scipy.io import loadmat
 
-import rospy
 from grid_map_msgs.msg import GridMap
 from source_seeking.msg import Ck
 from environment_and_measurement import Environment, DEBUG

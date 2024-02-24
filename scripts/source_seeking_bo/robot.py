@@ -8,12 +8,13 @@ from controller.utils import convert_phi2phik, convert_phik2phi
 import numpy as np
 
 from environment.environment_and_measurement import Environment, DEBUG
-from environment.environment_and_measurement import CAM_FOV, SRC_MUT_D_THRESHOLD, LCB_THRESHOLD, STUCK_PTS_THRESHOLD 
+from environment.environment_and_measurement import CAM_FOV, SRC_MUT_D_THRESHOLD, LCB_THRESHOLD, STUCK_PTS_THRESHOLD, USE_BO, BO_RADIUS
 
 from sklearn.gaussian_process import GaussianProcessRegressor
 from sklearn.gaussian_process.kernels import RBF, WhiteKernel
 
 from scipy.ndimage import maximum_filter
+from source_seeking_module.bayesian_optimization import BayesianOptimizationCentralized
 
 def find_peak(matrix, strict=True):
     
@@ -85,7 +86,6 @@ class Robot(object): # python (x,y) therefore col index first, row next
         # samples 
         self.samples_X = np.array([start_position])
         self.samples_Y = np.array(self.environment.sampling([start_position]))
-        
         self.trajectory = [start_position]
         
         ## ROBOT neigibours
@@ -100,6 +100,23 @@ class Robot(object): # python (x,y) therefore col index first, row next
             kernel=kernel_initial(),
             n_restarts_optimizer=10
         )
+        ## BO for source seeking module
+        self.use_BO = USE_BO
+        if self.use_BO:
+            self.BO = BayesianOptimizationCentralized(domain=np.array([[0,self.field_size[0]],[0,self.field_size[1]]]),
+                                n_workers=1,
+                                kernel='Matern',
+                                acquisition_function='es',
+                                policy='greedy',
+                                regularization=None,
+                                regularization_strength=0.01,
+                                pending_regularization=None,
+                                pending_regularization_strength=0.01,
+                                grid_density=100,
+                                BO_radius = BO_RADIUS
+                            )
+            self.BO.initialize(self.samples_X, self.samples_Y)
+        
         self.estimation = None
         self.variance = None
         self.peaks_cord = None
@@ -190,7 +207,9 @@ class Robot(object): # python (x,y) therefore col index first, row next
         # 根据这些索引保留 samples_X 和 samples_Y 中的非重复元素
         _, unique_indices = np.unique(self.samples_X, axis=0, return_index=True)
         self.samples_X = self.samples_X[unique_indices]
-        self.samples_Y = self.samples_Y[unique_indices]      
+        self.samples_Y = self.samples_Y[unique_indices]  
+        if self.use_BO == True:
+            self.BO.train_gp(self.samples_X, self.samples_Y)   
         self.gp.fit(self.samples_X, self.samples_Y)
         # Bayesian inference
         μ_test, σ_test = self.gp.predict(self.X_test, return_std=True)
@@ -209,7 +228,7 @@ class Robot(object): # python (x,y) therefore col index first, row next
         
          # calculate phik based on MI
         self.phik = convert_phi2phik(self.Erg_ctrl.basis, self.gp_mi, self.grid)
-        phi = convert_phik2phi(self.Erg_ctrl.basis, self.phik , self.grid)
+        # phi = convert_phik2phi(self.Erg_ctrl.basis, self.phik , self.grid)
         
         return self.estimation*self.responsible_region, self.gp_mi*self.responsible_region
     
@@ -225,7 +244,7 @@ class Robot(object): # python (x,y) therefore col index first, row next
                 phik.append(phik_pack[neighbour_index])
             phik_consensus = np.mean(phik, axis=0)
             self.Erg_ctrl.phik = 0.0025*phik_consensus
-        phi = convert_phik2phi(self.Erg_ctrl.basis, phik_consensus , self.grid)
+        phi = convert_phik2phi(self.Erg_ctrl.basis, phik_consensus, self.grid)
 
         return phi.reshape(self.test_resolution)
         
@@ -267,8 +286,7 @@ class Robot(object): # python (x,y) therefore col index first, row next
                 phi_vals /= np.sum(phi_vals)
                 self.Erg_ctrl.phik = convert_phi2phik(self.Erg_ctrl.basis, phi_vals, self.grid)
 
-            # determine whether to active sensing or source seeking
-            
+            ## step 4-1 determine whether to active sensing or source seeking
             # remove the peak that has already been visited
             indices_to_remove = []
             for i, peak in enumerate(self.peaks_cord):
@@ -284,20 +302,27 @@ class Robot(object): # python (x,y) therefore col index first, row next
                         indices_to_remove.append(i)
                         break
             
-            # all potential peaks that haven't been visited
+            # list all potential peaks that haven't been visited
             peaks_cord = [peak for i, peak in enumerate(self.peaks_cord) if i not in indices_to_remove]
             peaks_LCB = [lcb for i, lcb in enumerate(self.peaks_LCB) if i not in indices_to_remove]
             
             # determine whether there is a peak of good confidence  
             lcb_value = self.LCB_THRESHOLD - 0.002*self.iteration
-            if peaks_LCB and np.max(peaks_LCB) > lcb_value:   
-                index = np.argmax(peaks_LCB)
-                distance = cdist([self.trajectory[-1]], [peaks_cord[index]])[0][0]
-                self.target = peaks_cord[index]
+            if peaks_LCB and np.max(peaks_LCB) > lcb_value: 
+                if self.use_BO == True: # use BO to select target
+                    index = np.argmax(peaks_LCB)
+                    center_of_searching_area = peaks_cord[index] # search around the estimated peak
+                    self.target = self.BO.find_next_query(self.iteration, center_of_searching_area)[0].tolist()
+                else: # select the peak of mean with highest LVB value as target 
+                    index = np.argmax(peaks_LCB)
+                    self.target = peaks_cord[index]
+                    # distance = cdist([self.trajectory[-1]], [peaks_cord[index]])[0][0]
                 active_sensing = False
             
+            ## step 4-2: Conduct active sensing or source seeking !
             # calculate control command
-            if active_sensing:
+            
+            if active_sensing: # active sensing
                 ctrl = self.Erg_ctrl(self.robot_state)
                 if DEBUG:
                     print("ES: ", np.linalg.norm(ctrl))
@@ -309,15 +334,16 @@ class Robot(object): # python (x,y) therefore col index first, row next
                 if DEBUG:
                     print("mpc: ", np.linalg.norm(ctrl), "with target: ", self.target)
 
-        # move based on ctrl command
+        ## step 4-3 move based on ctrl command
         self.robot_state = self.robot_dynamic.step(ctrl)         
         setpoint = [[ self.field_size[0]*self.robot_state[0], self.field_size[1]*self.robot_state[1] ]]
 
         stepsize = np.linalg.norm( np.array(setpoint)-np.array(self.trajectory[-1]) )
         if DEBUG:
             print("stepsize = ", stepsize)
-        if (not active_sensing) and stepsize < 0.1: # get stuck at none sources area 
-        # if (not active_sensing) and stepsize < 0.1 and np.linalg.norm(ctrl) < CTR_MAG_DETERMIN_STUCK: # get stuck at none sources area 
+        
+        ## Determine whether get stuck at none sources area 
+        if (not active_sensing) and stepsize < 0.1: 
             if (self.stuck_times >= 2):
                 self.stuck_points.append(setpoint)
                 if DEBUG:
@@ -333,8 +359,8 @@ class Robot(object): # python (x,y) therefore col index first, row next
         self.trajectory = self.trajectory + setpoint
         setpoint = np.array(setpoint)
         
-        # determine whether the source is found
-        # some special sensors here (maybe camera here to determine whether a source is found)
+        ## step 4-4 determine whether the source is found
+        # we assume some special sensors should be used here (maybe camera here to determine whether a source is found)
         source_cord = self.environment.find_source(setpoint)
         if (source_cord is not None) and (self.target is not None):
             if DEBUG:

@@ -3,7 +3,7 @@ from scipy.stats import multivariate_normal
 import numpy as np
 from matplotlib import pyplot as plt
 
-DEBUG = True
+DEBUG = False
 FIELD_SIZE = [10, 10]
 
 CAM_FOV = 0.4 # to distinguish whether this is one source or two source
@@ -12,6 +12,9 @@ SRC_MUT_D_THRESHOLD = 1
 LCB_THRESHOLD = 0.15  
 FIELD_SIZE_X = 10
 FIELD_SIZE_Y = 10
+
+USE_BO = True
+BO_RADIUS = 0.5
 
 CTR_MAG_DETERMIN_STUCK = 0.15
 STUCK_PTS_THRESHOLD = 0.1 # smaller than this threshold are considered as the same stuck pt
@@ -40,13 +43,13 @@ class Environment():    # class for robot to interact with the environment
         self.SOURCES = SOURCES_case[source_case_index]
         self.SOURCE_SET = {tuple(item) for item in self.SOURCES}
         self.field_size = FIELD_SIZE
-        
+        n=0.6
         def get_f(sources):
-            source1 = multivariate_normal(sources[0], 0.8*np.eye(2))
-            source2 = multivariate_normal(sources[1], 0.9*np.eye(2))
-            source3 = multivariate_normal(sources[2], 0.85*np.eye(2))
-            source4 = multivariate_normal(sources[3], 0.9*np.eye(2))
-            source5 = multivariate_normal(sources[4], 0.9*np.eye(2))
+            source1 = multivariate_normal(sources[0], 0.8*n*np.eye(2))
+            source2 = multivariate_normal(sources[1], 0.9*n*np.eye(2))
+            source3 = multivariate_normal(sources[2], 0.85*n*np.eye(2))
+            source4 = multivariate_normal(sources[3], 0.9*n*np.eye(2))
+            source5 = multivariate_normal(sources[4], 0.9*n*np.eye(2))
 
             f = lambda x: source1.pdf(x) + 1.05*source2.pdf(x) + source3.pdf(x) + 1.1*source4.pdf(x) + source5.pdf(x)
             return f
@@ -86,11 +89,49 @@ if __name__ == '__main__':
     for i, sources in enumerate(SOURCES_case):
         env = Environment(i)
 
-        plt.title(f"Topology {i}:")
 
-        # 设置图像的长宽比为一致
+        # # 设置图像的长宽比为一致
         plt.gca().set_aspect('equal', adjustable='box')
 
-        plt.contourf(X_test_xx, X_test_yy, env.f(X_test).reshape(test_resolution))
+        plt.contourf(X_test_xx, X_test_yy, env.f(X_test).reshape(test_resolution), cmap='coolwarm',  edgecolor='none', levels=100)
+        plt.xticks([])
+        plt.yticks([])
+        # 
         plt.show()
+        fig = plt.figure(figsize=(40, 20))
+        
+        ax = fig.add_subplot(111, projection='3d')
+        ax.set_box_aspect([1,1,0.1])  # Aspect ratio is 1:1:0.2, making Z axis changes appear flatter
+
+        ax.plot_surface(X_test_xx, X_test_yy, env.f(X_test).reshape(test_resolution), cmap='coolwarm', edgecolor='none', rcount=100, ccount=100, linewidth=0.5)
+        ax.view_init(elev=30, azim=45)  # elev是仰角，azim是方位角
+        ax.set_xticks([])
+        ax.set_yticks([])
+        ax.set_zticks([])
+
+        # 隐藏所有轴标签
+        ax.set_xlabel('')
+        ax.set_ylabel('')
+        ax.set_zlabel('')
+
+        # 隐藏网格线
+        ax.grid(False)
+
+        ax.set_axis_off()
+
+
+        # 隐藏轴背景
+        ax.set_facecolor((0,0,0,0))  # 设置透明背景
+
+        # 隐藏边框
+        ax.xaxis.pane.fill = False
+        ax.yaxis.pane.fill = False
+        ax.zaxis.pane.fill = False
+        ax.xaxis.pane.set_edgecolor('w')
+        ax.yaxis.pane.set_edgecolor('w')
+        ax.zaxis.pane.set_edgecolor('w')
+        plt.show()
+        
+        
+        break
     

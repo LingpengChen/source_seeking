@@ -1,6 +1,9 @@
 import os
 import numpy as np
 import matplotlib.pyplot as plt
+plt.rcParams.update({'font.size': 15}) # 设置全局字号为12 rmse
+
+np.random.seed(2)
 
 def generate_sequence(start_value, end_value, length):
     sequence = [start_value]
@@ -16,35 +19,31 @@ def generate_sequence(start_value, end_value, length):
     sequence[-1] = end_value
     return sequence
 
-# Assuming the file structure and that each file has the same length/format for temperatures
-folder_path = '/home/clp/catkin_ws/src/source_seeking/record/'
-files = os.listdir(folder_path)
+def read_txt_file(dir):
+    files = os.listdir(dir)
+    iteration_records = []
+    rmse_list = []
+    for file in files:
+        if file.endswith('.txt'):
+            file_path = os.path.join(folder_path, file)
+            with open(file_path, 'r') as f:
+                temperatures = f.read().splitlines()
+                iteration_records.append(len(temperatures))
+    max_length = max(iteration_records)
 
-##############################################################
-# proposed method
-iteration_records = []
-proposed_method_rmse = []
+    for file in files:
+        if file.endswith('.txt'):
+            file_path = os.path.join(folder_path, file)
+            with open(file_path, 'r') as f:
+                iteration_record = f.read().splitlines()            
+                iteration_record = [float(temp) for temp in iteration_record]
+                temperatures_padded = np.pad(iteration_record, (0, max_length - len(iteration_record)), 'constant', constant_values=np.nan)
+                rmse_list.append(temperatures_padded)
 
-for file in files:
-    if file.endswith('.txt'):
-        file_path = os.path.join(folder_path, file)
-        with open(file_path, 'r') as f:
-            temperatures = f.read().splitlines()
-            iteration_records.append(len(temperatures))
-max_length = max(iteration_records)
-
-for file in files:
-    if file.endswith('.txt'):
-        file_path = os.path.join(folder_path, file)
-        with open(file_path, 'r') as f:
-            iteration_record = f.read().splitlines()            
-            iteration_record = [float(temp) for temp in iteration_record]
-            temperatures_padded = np.pad(iteration_record, (0, max_length - len(iteration_record)), 'constant', constant_values=np.nan)
-            proposed_method_rmse.append(temperatures_padded)
-
-proposed_method_rmse = np.array(proposed_method_rmse)
-mean_es = np.nanmean(proposed_method_rmse, axis=0)
-variance_es = np.nanvar(proposed_method_rmse, axis=0)
+    rmse_list = np.array(rmse_list)
+    mean = np.nanmean(rmse_list, axis=0)
+    variance = np.nanvar(rmse_list, axis=0)
+    return iteration_records, mean, variance
 
 ##############################################################
 # data_greedy_no_prior
@@ -102,21 +101,36 @@ data_greedy_rmse = np.array(data_greedy_rmse)
 mean_greedy = np.nanmean(data_greedy_rmse, axis=0)
 variance_greedy = np.nanvar(data_greedy_rmse, axis=0)
 
+
+##############################################################
+# proposed method
+folder_path = '/home/clp/catkin_ws/src/source_seeking/record/proposed_method/'
+iteration_records_p, mean_p, variance_p = read_txt_file(folder_path)
+
+# combined method
+folder_path = '/home/clp/catkin_ws/src/source_seeking/record/comparation_test/'
+iteration_records_c, mean_c, variance_c = read_txt_file(folder_path)
+
 # Plotting
 plt.figure(figsize=(10, 6))
 
-days_es = np.arange(1, mean_es.shape[0] + 1)
+days_p = np.arange(1, mean_p.shape[0] + 1)
+days_c = np.arange(1, mean_c.shape[0] + 1)
 days_gd_no = np.arange(1, mean_greedy_no_prior.shape[0] + 1)
 days_gd = np.arange(1, mean_greedy.shape[0] + 1)
 
-plt.plot(days_es, mean_es, label='Proposed method', color='blue')
-plt.fill_between(days_es, mean_es - 100*variance_es, mean_es + 100*variance_es, color='lightblue', alpha=0.5)
+plt.plot(days_p, mean_p, label='Proposed method', color='blue')
+plt.fill_between(days_p, mean_p - 60*variance_p, mean_p + 60*variance_p, color='#7B9ED8', alpha=0.5)
 
-plt.plot(days_gd_no, mean_greedy_no_prior, label='Greedy method (no prior knowledge)', color='green')
-plt.fill_between(days_gd_no, mean_greedy_no_prior - 100*variance_greedy_no_prior, mean_greedy_no_prior + 100*variance_greedy_no_prior, color='lightgreen', alpha=0.5)
 
-plt.plot(days_gd, mean_greedy, label='Greedy method (10 prior knowledge)', color='red')
-plt.fill_between(days_gd, mean_greedy - 100*variance_greedy, mean_greedy + 100*variance_greedy, color='pink', alpha=0.5)
+plt.plot(days_gd_no, mean_greedy_no_prior, label='Greedy method (no prior knowledge)', color='orange')
+plt.fill_between(days_gd_no, mean_greedy_no_prior - 60*variance_greedy_no_prior, mean_greedy_no_prior + 60*variance_greedy_no_prior, color='orange', alpha=0.5)
+
+plt.plot(days_gd, mean_greedy, label='Greedy method (10 prior knowledge)', color='green')
+plt.fill_between(days_gd, mean_greedy - 60*variance_greedy, mean_greedy + 60*variance_greedy, color='lightgreen', alpha=0.5)
+
+plt.plot(days_c, mean_c, label='Combined method', color='red')
+plt.fill_between(days_c, mean_c - 60*variance_c, mean_c + 60*variance_c, color='pink', alpha=0.5)
 
 plt.title('Decrease of weighted root mean square error')
 plt.xlabel('Iterations')

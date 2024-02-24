@@ -1,28 +1,16 @@
 import os
-import csv
-import copy
-import json
 import imageio.v2 as imageio
 import datetime
 import warnings
 import itertools
-import __main__
 import numpy as np
-import matplotlib.pyplot as plt
-import matplotlib.ticker as ticker
 
-from tqdm import tqdm
-from matplotlib import cm
-from scipy.stats import norm
-from scipy.optimize import minimize
-from matplotlib.lines import Line2D
-from matplotlib.patches import Patch
 from sklearn.utils import check_random_state
 from sklearn.preprocessing import StandardScaler
 from sklearn.gaussian_process import kernels, GaussianProcessRegressor
 import torch
 import gpytorch
-import pandas as pd
+from torch import nn
 
 warnings.filterwarnings("ignore")
 
@@ -205,7 +193,7 @@ class BayesianOptimizationCentralized(bayesian_optimization):
                  acquisition_function = 'es', policy = 'greedy', 
                  epsilon = 0.01, regularization = None, regularization_strength = None,
                  pending_regularization = None, pending_regularization_strength = None,
-                 grid_density = 100):
+                 grid_density = 100, BO_radius=1, env=None):
 
         super(BayesianOptimizationCentralized, self).__init__(domain=domain, n_workers=n_workers,
                  kernel=kernel, alpha=alpha,
@@ -213,13 +201,16 @@ class BayesianOptimizationCentralized(bayesian_optimization):
                  epsilon = epsilon, regularization = regularization, regularization_strength = regularization_strength,
                  pending_regularization = pending_regularization, pending_regularization_strength = pending_regularization_strength,
                  grid_density = grid_density)
+        
         self.diversity_penalty = False
         self.radius = 0.2
-        
+        self.BO_radius = BO_radius
         self.X_train = []
         self.Y_train =[]
         self.X = []
         self.Y = []
+        if env is not None:
+            self.environment = env
         
         if acquisition_function == 'es':
             self._acquisition_function = self._entropy_search_grad
@@ -228,7 +219,7 @@ class BayesianOptimizationCentralized(bayesian_optimization):
             print('Supported acquisition functions: es')
             return
 
-    def _entropy_search_grad(self, a, x, n, radius=0.1):
+    def _entropy_search_grad(self, x, n, radius=0.1):
         """
                 Entropy search acquisition function.
                 Args:
@@ -277,7 +268,7 @@ class BayesianOptimizationCentralized(bayesian_optimization):
             x.detach_()
         return x.clone().detach().numpy()
 
-    def find_next_query(self, n, a, random_search=1000, decision_type='distributed'):
+    def find_next_query(self, n, center_of_searching_area=None, random_search=100):
         """
         Proposes the next query.
         Arguments:
@@ -292,10 +283,21 @@ class BayesianOptimizationCentralized(bayesian_optimization):
                 Number of random samples used to optimize the acquisition function. Default 1000
         """
         # Candidate set
-        x = np.random.uniform(self.domain[:, 0], self.domain[:, 1], size=(random_search, self._dim))
+        # 计算新的搜索区域的domain
+        if center_of_searching_area is not None:
+            new_lower_bounds = np.array(center_of_searching_area) - self.BO_radius
+            new_upper_bounds = np.array(center_of_searching_area) + self.BO_radius
+
+            # 将新的搜索区域边界与原始domain进行比较，确保不超出原始domain的范围
+            search_area_domain = np.vstack((np.maximum(new_lower_bounds, self.domain[:, 0]),
+                                            np.minimum(new_upper_bounds, self.domain[:, 1]))).T
+        else:
+            search_area_domain = self.domain
+        
+        x = np.random.uniform(search_area_domain[:, 0], search_area_domain[:, 1], size=(random_search, self._dim))
         X = x[:]
         # Calculate acquisition function
-        x = self._acquisition_function(a, X, n)
+        x = self._acquisition_function(X, n)
         return x
 
     def initialize(self, x0, y0, n_pre_samples=None):
@@ -303,12 +305,14 @@ class BayesianOptimizationCentralized(bayesian_optimization):
         if n_pre_samples is not None:
             for params in np.random.uniform(self.domain[:, 0], self.domain[:, 1], (n_pre_samples, self.domain.shape[0])): #np.random.uniform([-2, -1]), self.domain([2, 3]), (15, 2))
                 self.X.append(params)
-                self.Y.append(y0)
+                self.Y.append(self.environment.sampling([params]).tolist()[0])
    
         # Change definition of x0 to be specfic for each agent
         for params in x0:
             self.X.append(params)
-            self.Y.append(y0)
+            
+        for params in y0:
+            self.Y.append(params)
             
         self._initial_data_size = len(self.Y)
 
@@ -317,17 +321,32 @@ class BayesianOptimizationCentralized(bayesian_optimization):
         self.model = TorchGPModel(torch.tensor(self.X).float(), torch.tensor(Y).float())
         self.model.train()
     
-    def train_gp(self, query_x, query_y):
+    def train_gp_query(self, query_x, query_y):
         # parallel/centralized decision
         if query_x is not None:
             self.X = self.X + [q for q in query_x]
             self.Y = self.Y + [q for q in query_y]
-
+            # [array([1, 2]), array([6.0276337, 5.448832 ], dtype=float32)]
+            # [0.002092557288551139, 0.049154258073264276]
             ## Fit GP 
             X = np.array(self.X)
             # Standardize
             Y = self.scaler[0].fit_transform(np.array(self.Y).reshape(-1, 1)).squeeze()
             # Fit surrogate
+            self.model.fit(X, Y)
+            self.model.train()
+        return
+            
+    def train_gp(self, query_x, query_y):
+        # parallel/centralized decision
+        if query_x is not None:   
+            self.X = query_x
+                
+            self.Y = query_y
+                
+            # Standardize
+            X = np.array(self.X)
+            Y = self.scaler[0].fit_transform(np.array(self.Y).reshape(-1, 1)).squeeze()
             self.model.fit(X, Y)
             self.model.train()
         return

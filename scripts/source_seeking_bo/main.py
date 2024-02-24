@@ -233,6 +233,7 @@ def experiment():
                 plt.show()
             # if iteration == 2:
             if end:
+                print("Experiment_", experiment_case, "Finished!")
                 plt.savefig(save_img_path)
                 plt.close()
                 with open(save_rmse_path, 'w', encoding='utf-8') as file:
@@ -240,7 +241,6 @@ def experiment():
                         file.write(str(item) + '\n')
                 break
 
-    print("Experiment_", experiment_case, "Finished!")
 
 def print_progress_bar(index, iteration):
     position = index%4+1
