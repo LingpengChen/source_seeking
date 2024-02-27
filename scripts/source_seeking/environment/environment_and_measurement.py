@@ -16,7 +16,8 @@ FIELD_SIZE_Y = 10
 CTR_MAG_DETERMIN_STUCK = 0.15
 STUCK_PTS_THRESHOLD = 0.1 # smaller than this threshold are considered as the same stuck pt
 
-SOURCES_case = np.array([[[2,6], [8,7],[8,2], [5,6], [3,2]],  # 0
+SOURCES_case = np.array([ [[5,5], [9,9],[9,5], [5,9], [7,7]],
+    [[2,6], [8,7],[8,2], [5,6], [3,2]],  # 0
 [[3.0, 4.5], [6.5, 2.5], [2.5, 8.0], [5.5, 7.0], [8.0, 7.0]] ,
 [[8.0, 2.5], [2.5, 5.5], [7.5, 5.5], [4.5, 2.0], [6.0, 8.0]] , 
 [[8.0, 8.0], [6.0, 5.5], [6.0, 2.5], [2.0, 2.0], [3.5, 8.0]] , #3
@@ -93,4 +94,5 @@ if __name__ == '__main__':
 
         plt.contourf(X_test_xx, X_test_yy, env.f(X_test).reshape(test_resolution))
         plt.show()
+        break
     

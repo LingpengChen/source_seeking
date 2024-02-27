@@ -8,14 +8,14 @@ plt.rcParams.update({'font.size': 15}) # 设置全局字号为12 rmse
 # 原始数据
 proposed_method_iterations = [56, 62, 44, 59, 48, 49, 75, 58, 50, 67, 63, 85, 59, 61, 57, 64, 68, 67, 74, 59, 78, 63, 52, 66, 76, 54, 62, 53, 49, 87, 52, 88]
 
-print(len(proposed_method_iterations))
 # 原始数据的均值和方差
 original_mean = np.mean(proposed_method_iterations)
 original_variance = np.var(proposed_method_iterations)
+print(original_mean, original_variance)
 
 BO_combined_iterations =     [76, 66, 47, 67, 56, 50, 66, 46, 64, 60, 71, 74, 66, 56, 58, 48, 61, 65, 54, 61, 62, 66, 60, 58, 46, 53, 54, 63, 46, 72, 68, 70]
-print(len(BO_combined_iterations))
 combined_mean = np.mean(BO_combined_iterations)
+print(combined_mean)
 combined_variance = np.var(BO_combined_iterations)
 
 
@@ -42,7 +42,6 @@ plt.figure(figsize=(9, 6))
 # palette = ["#E41A1C", "#FFD92F", "#377EB8", "#4DAF4A"]
 # sns.boxplot(data=[proposed_method_iterations, temperatures_2, temperatures_1,  BO_combined_iterations ], palette=palette)
 sns.boxplot(data=[proposed_method_iterations, temperatures_2, temperatures_1,  BO_combined_iterations ])
-plt.title('Box Plot of iterations')
 plt.tight_layout()
 plt.xticks([0, 1, 2, 3], ['Proposed method\n(no prior)', 'Greedy method\n(no prior)', 'Greedy method\n(10 prior)', 'Combined method\n(no prior)'])
 plt.ylabel('Iterations')

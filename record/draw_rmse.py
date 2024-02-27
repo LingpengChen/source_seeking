@@ -119,20 +119,21 @@ days_c = np.arange(1, mean_c.shape[0] + 1)
 days_gd_no = np.arange(1, mean_greedy_no_prior.shape[0] + 1)
 days_gd = np.arange(1, mean_greedy.shape[0] + 1)
 
-plt.plot(days_p, mean_p, label='Proposed method', color='blue')
+plt.xlim(-5, 125)
+
+plt.plot(days_p, mean_p, label='Proposed method (no prior)', color='blue')
 plt.fill_between(days_p, mean_p - 60*variance_p, mean_p + 60*variance_p, color='#7B9ED8', alpha=0.5)
 
 
-plt.plot(days_gd_no, mean_greedy_no_prior, label='Greedy method (no prior knowledge)', color='orange')
+plt.plot(days_gd_no, mean_greedy_no_prior, label='Greedy method (no prior)', color='orange')
 plt.fill_between(days_gd_no, mean_greedy_no_prior - 60*variance_greedy_no_prior, mean_greedy_no_prior + 60*variance_greedy_no_prior, color='orange', alpha=0.5)
 
-plt.plot(days_gd, mean_greedy, label='Greedy method (10 prior knowledge)', color='green')
+plt.plot(days_gd, mean_greedy, label='Greedy method (10 prior)', color='green')
 plt.fill_between(days_gd, mean_greedy - 60*variance_greedy, mean_greedy + 60*variance_greedy, color='lightgreen', alpha=0.5)
 
-plt.plot(days_c, mean_c, label='Combined method', color='red')
+plt.plot(days_c, mean_c, label='Combined method (no prior)', color='red')
 plt.fill_between(days_c, mean_c - 60*variance_c, mean_c + 60*variance_c, color='pink', alpha=0.5)
 
-plt.title('Decrease of weighted root mean square error')
 plt.xlabel('Iterations')
 plt.ylabel('WRMSE')
 plt.legend()
