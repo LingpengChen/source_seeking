@@ -10,7 +10,7 @@ from utils.analysis_utils import calculate_wrmse
 from utils.vonoroi_utils import voronoi_neighbours
 from scipy.spatial import Voronoi, voronoi_plot_2d
 
-from robot import Robot
+from combined_robot_GMES import Robot
 
 ## Initilize environment
 from environment.environment_and_measurement import Environment, ROBOT_INIT_LOCATIONS_case, DEBUG  
@@ -233,6 +233,7 @@ def experiment():
                 plt.show()
             # if iteration == 2:
             if end:
+                print("Experiment_", experiment_case, "Finished!")
                 plt.savefig(save_img_path)
                 plt.close()
                 with open(save_rmse_path, 'w', encoding='utf-8') as file:
@@ -240,7 +241,6 @@ def experiment():
                         file.write(str(item) + '\n')
                 break
 
-    print("Experiment_", experiment_case, "Finished!")
 
 def print_progress_bar(index, iteration):
     position = index%4+1
@@ -263,8 +263,8 @@ if __name__ == '__main__':
     robo_num = 3
     robot_locations = ROBOT_INIT_LOCATIONS_case[robot_ini_loc_index]
 
-    save_img_path = "/home/clp/catkin_ws/src/source_seeking/record/proposed_method/experiment_case_" + str(experiment_case) + ".png"
-    save_rmse_path = "/home/clp/catkin_ws/src/source_seeking/record/proposed_method/experiment_case_" + str(experiment_case) + ".txt"
+    save_img_path = "/home/clp/catkin_ws/src/source_seeking/record/special_case/experiment_case_" + str(experiment_case) + ".png"
+    save_rmse_path = "/home/clp/catkin_ws/src/source_seeking/record/special_case/experiment_case_" + str(experiment_case) + ".txt"
 
     #############################################################
     ## Define the source field
