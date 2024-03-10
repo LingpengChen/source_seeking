@@ -11,8 +11,70 @@ from sklearn.gaussian_process import kernels, GaussianProcessRegressor
 import torch
 import gpytorch
 from torch import nn
+from scipy.ndimage import maximum_filter
 
 warnings.filterwarnings("ignore")
+
+def find_peak(matrix):
+    # First just find three argmax
+    # rounded_matrix = np.around(matrix, decimals=2)
+    local_maxima = []
+    for i in range(3):
+        flat_index = np.argmax(matrix)
+        row_index, col_index = np.unravel_index(flat_index, matrix.shape)
+        radius = 5
+        # 计算要设置为 0 的区域的边界
+        row_min = max(0, row_index - radius)
+        row_max = min(matrix.shape[0], row_index + radius + 1)
+        col_min = max(0, col_index - radius)
+        col_max = min(matrix.shape[1], col_index + radius + 1)
+        # 将指定区域设置为 0
+        matrix[row_min:row_max, col_min:col_max] = 0
+        local_maxima.append([row_index, col_index])
+        
+    return np.array(local_maxima)[:, [1, 0]]
+    # return np.array(local_maxima)
+
+# def find_peak(matrix):
+#     if len(indices) > 3:
+#         pass
+    
+#     flat_indices = np.argpartition(matrix.ravel(), -3)[-3:]
+
+#     # 将展平的索引转换回二维索引
+#     row_indices, col_indices = np.unravel_index(flat_indices, matrix.shape)
+#     # 打印前三大元素及其位置
+ 
+#     maximums = [matrix[row_indices[i], col_indices[i]] for i in range(3)]
+#     argmaxs = [[row_indices[i], col_indices[i]] for i in range(3)]
+    
+#     print(argmaxs)
+#     # 使用最大滤波器找到每个位置的局部最大值
+#     local_max = maximum_filter(matrix, size=5) == matrix # [[F F][T F]]
+    
+#     # 获取局部最大值的坐标
+#     local_maxima_coords = np.argwhere(local_max)
+#     step_len = 1
+#         # 过滤出严格大于其周围邻居的局部最大值
+#     strict_local_maxima = []
+#     for i, j in local_maxima_coords:
+#         if i > step_len and j > step_len and i < matrix.shape[0] - step_len and j < matrix.shape[1] - step_len:
+#             neighbors = [matrix[i-step_len, j-step_len], matrix[i-step_len, j], matrix[i-step_len, j+step_len],
+#                         matrix[i, j-step_len],                 matrix[i, j+step_len],
+#                         matrix[i+step_len, j-step_len], matrix[i+step_len, j], matrix[i+step_len, j+step_len]]
+#             if all(matrix[i, j] > neighbor for neighbor in neighbors):
+#                 strict_local_maxima.append([i,j])
+#     print(strict_local_maxima)                
+#     if (len(strict_local_maxima)<3):
+#         for argmax in argmaxs:
+#             if argmax not in strict_local_maxima:
+#                 strict_local_maxima.append(argmax)
+#                 if len(strict_local_maxima) == 3:
+#                     break
+        
+#     return np.array(strict_local_maxima)[:, [1, 0]]
+
+
 
 class bayesian_optimization:
     def __init__(self, domain, n_workers = 1,
@@ -214,25 +276,27 @@ class BayesianOptimizationCentralized(bayesian_optimization):
         
         if acquisition_function == 'es':
             self._acquisition_function = self._entropy_search_grad
+        if acquisition_function == 'doss':
+            self._acquisition_function = self._doss
       
         else:
             print('Supported acquisition functions: es')
             return
 
-    def _entropy_search_grad(self, x, n, radius=0.1):
+    def _entropy_search_grad(self, x, n, beta=None):
         """
                 Entropy search acquisition function.
                 Args:
-                    a: # agents
                     x: array-like, shape = [n_samples, n_hyperparams]
-                    n: agent nums
                     projection: if project to a close circle
                     radius: circle of the projected circle
                 """
 
         x = x.reshape(-1, self._dim)
-        self.beta = 3 - 0.019 * n
-
+        if beta is not None:
+            self.beta = beta
+        else:
+            self.beta = 3 - 0.0019 * n
         domain = self.domain
 
         mu, sigma = self.model.predict(x, return_std=True, return_tensor=True) # 11000
@@ -267,8 +331,35 @@ class BayesianOptimizationCentralized(bayesian_optimization):
             x = torch.where(x < torch.tensor(domain[:, 0]), torch.tensor(domain[:, 0]), x)
             x.detach_()
         return x.clone().detach().numpy()
+    
+    def _doss(self, x, n, beta=None):
 
-    def find_next_query(self, n, center_of_searching_area=None, random_search=100):
+        X_test_x = np.linspace(0, 10, 50)
+        X_test_y = X_test_x
+        X_test_xx, X_test_yy = np.meshgrid(X_test_x, X_test_y)
+        x = np.vstack(np.dstack((X_test_xx, X_test_yy))) # (2500,2)
+        
+        if beta is not None:
+            self.beta = beta
+        else:
+            self.beta = 3 - 0.0019 * n
+        # self.beta = 3 - 0.019 * n
+        print(self.beta)
+
+        mu, sigma = self.model.predict(x, return_std=True, return_tensor=True) # 11000
+        ucb = mu + self.beta * sigma
+        ucb = ucb.clone().detach().numpy()
+        # amaxucb = x[np.argmax(ucb.clone().detach().numpy())][np.newaxis, :]
+        targets = np.array(find_peak(ucb.reshape([50,50]))[:3])/5
+
+        # if self.n_workers > 1:
+        #     init_x = np.random.normal(amaxucb, 1.0, (self.n_workers, self.domain.shape[0]))
+        # else:
+        #     init_x = amaxucb
+        
+        return targets
+
+    def find_next_query(self, n, center_of_searching_area=None, random_search=100, beta=None):
         """
         Proposes the next query.
         Arguments:
@@ -297,8 +388,9 @@ class BayesianOptimizationCentralized(bayesian_optimization):
         x = np.random.uniform(search_area_domain[:, 0], search_area_domain[:, 1], size=(random_search, self._dim))
         X = x[:]
         # Calculate acquisition function
-        x = self._acquisition_function(X, n)
+        x = self._acquisition_function(X, n, beta=beta)
         return x
+    
 
     def initialize(self, x0, y0, n_pre_samples=None):
         # Initial data
@@ -324,8 +416,8 @@ class BayesianOptimizationCentralized(bayesian_optimization):
     def train_gp_query(self, query_x, query_y):
         # parallel/centralized decision
         if query_x is not None:
-            self.X = self.X + [q for q in query_x]
-            self.Y = self.Y + [q for q in query_y]
+            self.X = self.X + [q for q in query_x.copy()]
+            self.Y = self.Y + [q for q in query_y.copy()]
             # [array([1, 2]), array([6.0276337, 5.448832 ], dtype=float32)]
             # [0.002092557288551139, 0.049154258073264276]
             ## Fit GP 

@@ -131,7 +131,7 @@ def experiment():
         
     ## Visualize
         # if iteration == 40 or (iteration >= 45 and iteration % 5 == 0 and SHOWN) or end:
-        debug_print = DEBUG and (iteration == 5 or (iteration >= 10 and iteration % 5 == 0))
+        debug_print = DEBUG and (iteration == 5 or (iteration >= 10 and iteration % 10 == 0))
        
         if debug_print or end:
             sizes = 5  # 可以是一个数字或者一个长度为N的数组，表示每个点的大小              
@@ -263,8 +263,8 @@ if __name__ == '__main__':
     robo_num = 3
     robot_locations = ROBOT_INIT_LOCATIONS_case[robot_ini_loc_index]
 
-    save_img_path = "/home/clp/catkin_ws/src/source_seeking/record/special_case/experiment_case_" + str(experiment_case) + ".png"
-    save_rmse_path = "/home/clp/catkin_ws/src/source_seeking/record/special_case/experiment_case_" + str(experiment_case) + ".txt"
+    save_img_path = "/home/clp/catkin_ws/src/source_seeking/record/a_no_mean/experiment_case_" + str(experiment_case) + ".png"
+    save_rmse_path = "/home/clp/catkin_ws/src/source_seeking/record/a_no_mean/experiment_case_" + str(experiment_case) + ".txt"
 
     #############################################################
     ## Define the source field

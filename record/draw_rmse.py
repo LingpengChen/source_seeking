@@ -104,12 +104,14 @@ variance_greedy = np.nanvar(data_greedy_rmse, axis=0)
 
 ##############################################################
 # proposed method
-folder_path = '/home/clp/catkin_ws/src/source_seeking/record/proposed_method/'
+folder_path = '/home/clp/catkin_ws/src/source_seeking/record/a_no_mean/'
 iteration_records_p, mean_p, variance_p = read_txt_file(folder_path)
+print(iteration_records_p)
 
 # combined method
-folder_path = '/home/clp/catkin_ws/src/source_seeking/record/comparation_test/'
+folder_path = '/home/clp/catkin_ws/src/source_seeking/record/sb/'
 iteration_records_c, mean_c, variance_c = read_txt_file(folder_path)
+print(iteration_records_c)
 
 # Plotting
 plt.figure(figsize=(10, 6))

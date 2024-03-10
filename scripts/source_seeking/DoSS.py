@@ -12,8 +12,7 @@ from typing import List
 from itertools import permutations
 
 
-# algorithm='doss'
-algorithm='es'
+algorithm='doss'
 Update_target_per_iter = False
 
 def assign_targets_indices(robot_locations, targets):
@@ -79,8 +78,7 @@ for iteration in range(500):
     ## Step 1: Train
     BO.train_gp_query(query_x=query, query_y=environment.sampling([query]))
     
-    beta = 3
-    # beta = 3 - 0.0019 * iteration
+    beta = 3 - 0.0019 * iteration
     if Update_target_per_iter == False:
         ## Step 2: Get targets
         if reach_target:

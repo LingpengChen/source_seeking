@@ -3,7 +3,7 @@ from scipy.stats import multivariate_normal
 import numpy as np
 from matplotlib import pyplot as plt
 
-DEBUG = True
+DEBUG = False
 FIELD_SIZE = [10, 10]
 
 CAM_FOV = 0.4 # to distinguish whether this is one source or two source
@@ -18,9 +18,8 @@ BO_RADIUS = 0.5
 
 CTR_MAG_DETERMIN_STUCK = 0.15
 STUCK_PTS_THRESHOLD = 0.1 # smaller than this threshold are considered as the same stuck pt
-
-SOURCES_case = np.array([ [[5,5], [9,9],[9,5], [5,9], [7,7]],
-    [[2,6], [8,7],[8,2], [5,6], [3,2]],  # 0
+# [[5,5], [9,9],[9,5], [5,9], [7,7]],
+SOURCES_case = np.array([ [[2,6], [8,7],[8,2], [5,6], [3,2]],  # 0
 [[3.0, 4.5], [6.5, 2.5], [2.5, 8.0], [5.5, 7.0], [8.0, 7.0]] ,
 [[8.0, 2.5], [2.5, 5.5], [7.5, 5.5], [4.5, 2.0], [6.0, 8.0]] , 
 [[8.0, 8.0], [6.0, 5.5], [6.0, 2.5], [2.0, 2.0], [3.5, 8.0]] , #3
@@ -44,7 +43,7 @@ class Environment():    # class for robot to interact with the environment
         self.SOURCES = SOURCES_case[source_case_index]
         self.SOURCE_SET = {tuple(item) for item in self.SOURCES}
         self.field_size = FIELD_SIZE
-        n=0.6
+        n=1
         def get_f(sources):
             source1 = multivariate_normal(sources[0], 0.8*n*np.eye(2))
             source2 = multivariate_normal(sources[1], 0.9*n*np.eye(2))

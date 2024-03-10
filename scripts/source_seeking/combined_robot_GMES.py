@@ -223,7 +223,7 @@ class Robot(object): # python (x,y) therefore col index first, row next
             self.gamma_gp += variance
         
         # definition of phi_t(x) for all x
-        mutual_info_dist = μ_test + ucb_coeff * (np.sqrt(σ_test + self.gamma_gp) - np.sqrt(self.gamma_gp))
+        mutual_info_dist =ucb_coeff * (np.sqrt(σ_test + self.gamma_gp) - np.sqrt(self.gamma_gp))
         self.gp_mi = mutual_info_dist.reshape(self.test_resolution)
         
          # calculate phik based on MI
@@ -268,7 +268,7 @@ class Robot(object): # python (x,y) therefore col index first, row next
     def receive_source_cord(self, peaks):
         self.visited_peaks_cord = peaks
         
-    # step 4 move will ergodic control
+    # step 4 move with hybrid controller
     def get_nextpts(self, phi_vals=None, control_mode="NORMAL"):
         self.iteration += 1
         ctrl = None
@@ -372,6 +372,34 @@ class Robot(object): # python (x,y) therefore col index first, row next
         self.samples_Y = np.concatenate((self.samples_Y, self.environment.sampling(setpoint)), axis=0)
         
         return setpoint
+    
+    def get_nextpts_from_target(self, target):
+        ctrl_target = np.array(target) / self.field_size[0]
+        ctrl = self.Mpc_ctrl(self.robot_state, ctrl_target)
+        if DEBUG:
+            print("mpc: ", np.linalg.norm(ctrl), "with target: ", target)
+
+        ## step 4-3 move based on ctrl command
+        self.robot_state = self.robot_dynamic.step(ctrl)         
+        setpoint = [[ self.field_size[0]*self.robot_state[0], self.field_size[1]*self.robot_state[1] ]]
+
+        stepsize = np.linalg.norm( np.array(setpoint)-np.array(self.trajectory[-1]) )
+        if DEBUG:
+            print("stepsize = ", stepsize)
+                
+            
+        self.trajectory = self.trajectory + setpoint
+        setpoint = np.array(setpoint)
+        
+        ## step 4-4 determine whether the source is found
+        # we assume some special sensors should be used here (maybe camera here to determine whether a source is found)
+        source_cord = self.environment.find_source(setpoint)
+        if source_cord is not None:
+            if DEBUG:
+                print("source", source_cord, "is found by Robot ", self.index, "!", "The target is ", self.target)
+            self.visited_peaks_cord.append(list(source_cord))
+        
+        return setpoint, self.visited_peaks_cord
     
     # Tools
     def get_trajectory(self):

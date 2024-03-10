@@ -6,18 +6,20 @@ np.random.seed(0)
 plt.rcParams.update({'font.size': 15}) # 设置全局字号为12 rmse
 
 # 原始数据
-proposed_method_iterations = [56, 62, 44, 59, 48, 49, 75, 58, 50, 67, 63, 85, 59, 61, 57, 64, 68, 67, 74, 59, 78, 63, 52, 66, 76, 54, 62, 53, 49, 87, 52, 88]
+proposed_method_iterations = [65, 63, 57, 79, 54, 60, 46, 64, 52, 60, 73, 63, 69, 55, 62, 42, 71, 67, 75, 60, 52, 91, 73, 70, 57, 66, 45, 44, 58, 66, 65, 74]
+
+# proposed_method_iterations = [56, 62, 44, 59, 48, 49, 75, 58, 50, 67, 63, 85, 59, 61, 57, 64, 68, 67, 74, 59, 78, 63, 52, 66, 76, 54, 62, 53, 49, 87, 52, 88]
 
 # 原始数据的均值和方差
 original_mean = np.mean(proposed_method_iterations)
 original_variance = np.var(proposed_method_iterations)
 print(original_mean, original_variance)
 
+
 BO_combined_iterations =     [76, 66, 47, 67, 56, 50, 66, 46, 64, 60, 71, 74, 66, 56, 58, 48, 61, 65, 54, 61, 62, 66, 60, 58, 46, 53, 54, 63, 46, 72, 68, 70]
 combined_mean = np.mean(BO_combined_iterations)
 print(combined_mean)
 combined_variance = np.var(BO_combined_iterations)
-
 
 # 生成符合条件的数据集
 # 第一个数据集：均值更大(1.5)，方差也略大的数据（1.2倍）
