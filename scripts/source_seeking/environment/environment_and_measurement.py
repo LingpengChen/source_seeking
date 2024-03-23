@@ -3,7 +3,7 @@ from scipy.stats import multivariate_normal
 import numpy as np
 from matplotlib import pyplot as plt
 
-DEBUG = False
+DEBUG = True
 FIELD_SIZE = [10, 10]
 
 CAM_FOV = 0.4 # to distinguish whether this is one source or two source
@@ -89,7 +89,7 @@ if __name__ == '__main__':
     for i, sources in enumerate(SOURCES_case):
         env = Environment(i)
 
-
+        print(env.get_gt([[2,6], [8,7],[8,2], [5,6], [3,2]]))
         # # 设置图像的长宽比为一致
         plt.gca().set_aspect('equal', adjustable='box')
 

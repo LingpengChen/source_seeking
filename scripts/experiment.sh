@@ -12,8 +12,10 @@ for i in {28..31}
 do
    # Start each python script as a separate background process
    # python3 ./test.py $i &
-   python ./source_seeking/combined_main_GMES.py $i &
-   # python ./source_seeking_old_version/source_seeking_main_ES.py $i &
+   # python ./source_seeking/DoSS.py $i &
+   python ./source_seeking/GMES.py $i &
+   # python ./source_seeking/proposed_main.py $i &
+   # python ./source_seeking/combined_main_GMES.py $i &
    sleep 0.1
 done
 

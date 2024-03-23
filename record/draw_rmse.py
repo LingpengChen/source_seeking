@@ -126,7 +126,6 @@ plt.xlim(-5, 125)
 plt.plot(days_p, mean_p, label='Proposed method (no prior)', color='blue')
 plt.fill_between(days_p, mean_p - 60*variance_p, mean_p + 60*variance_p, color='#7B9ED8', alpha=0.5)
 
-
 plt.plot(days_gd_no, mean_greedy_no_prior, label='Greedy method (no prior)', color='orange')
 plt.fill_between(days_gd_no, mean_greedy_no_prior - 60*variance_greedy_no_prior, mean_greedy_no_prior + 60*variance_greedy_no_prior, color='orange', alpha=0.5)
 

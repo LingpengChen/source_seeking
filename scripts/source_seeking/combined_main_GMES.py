@@ -232,6 +232,7 @@ def experiment():
             if debug_print:
                 plt.show()
             # if iteration == 2:
+            
             if end:
                 print("Experiment_", experiment_case, "Finished!")
                 plt.savefig(save_img_path)
@@ -263,8 +264,8 @@ if __name__ == '__main__':
     robo_num = 3
     robot_locations = ROBOT_INIT_LOCATIONS_case[robot_ini_loc_index]
 
-    save_img_path = "/home/clp/catkin_ws/src/source_seeking/record/a_no_mean/experiment_case_" + str(experiment_case) + ".png"
-    save_rmse_path = "/home/clp/catkin_ws/src/source_seeking/record/a_no_mean/experiment_case_" + str(experiment_case) + ".txt"
+    save_img_path = "/home/clp/catkin_ws/src/source_seeking/record/3/DMSL_GMES/experiment_case_" + str(experiment_case) + ".png"
+    save_rmse_path = "/home/clp/catkin_ws/src/source_seeking/record/3/DMSL_GMES/experiment_case_" + str(experiment_case) + ".txt"
 
     #############################################################
     ## Define the source field

@@ -152,11 +152,11 @@ class bayesian_optimization:
         self._PNG_DIR_ = os.path.join(self._FIG_DIR_, "png")
         self._PDF_DIR_ = os.path.join(self._FIG_DIR_, "pdf")
         self._GIF_DIR_ = os.path.join(self._FIG_DIR_, "gif")
-        for path in [self._TEMP_DIR_, self._DATA_DIR_, self._FIG_DIR_, self._PNG_DIR_, self._PDF_DIR_, self._GIF_DIR_]:
-            try:
-                os.makedirs(path)
-            except FileExistsError:
-                pass
+        # for path in [self._TEMP_DIR_, self._DATA_DIR_, self._FIG_DIR_, self._PNG_DIR_, self._PDF_DIR_, self._GIF_DIR_]:
+        #     try:
+        #         os.makedirs(path)
+        #     except FileExistsError:
+        #         pass
 
         self.beta = None
 
@@ -280,7 +280,7 @@ class BayesianOptimizationCentralized(bayesian_optimization):
             self._acquisition_function = self._doss
       
         else:
-            print('Supported acquisition functions: es')
+            # print('Supported acquisition functions: es')
             return
 
     def _entropy_search_grad(self, x, n, beta=None):
@@ -344,7 +344,6 @@ class BayesianOptimizationCentralized(bayesian_optimization):
         else:
             self.beta = 3 - 0.0019 * n
         # self.beta = 3 - 0.019 * n
-        print(self.beta)
 
         mu, sigma = self.model.predict(x, return_std=True, return_tensor=True) # 11000
         ucb = mu + self.beta * sigma
@@ -409,7 +408,8 @@ class BayesianOptimizationCentralized(bayesian_optimization):
         self._initial_data_size = len(self.Y)
 
         # Standardize
-        Y = self.scaler[0].fit_transform(np.array(self.Y).reshape(-1, 1)).squeeze()
+        Y = np.array(self.Y)
+        # Y = self.scaler[0].fit_transform(np.array(self.Y).reshape(-1, 1)).squeeze()
         self.model = TorchGPModel(torch.tensor(self.X).float(), torch.tensor(Y).float())
         self.model.train()
     
@@ -422,8 +422,10 @@ class BayesianOptimizationCentralized(bayesian_optimization):
             # [0.002092557288551139, 0.049154258073264276]
             ## Fit GP 
             X = np.array(self.X)
+            Y = np.array(self.Y)
+            
             # Standardize
-            Y = self.scaler[0].fit_transform(np.array(self.Y).reshape(-1, 1)).squeeze()
+            # Y = self.scaler[0].fit_transform(np.array(self.Y).reshape(-1, 1)).squeeze()
             # Fit surrogate
             self.model.fit(X, Y)
             self.model.train()
@@ -438,7 +440,8 @@ class BayesianOptimizationCentralized(bayesian_optimization):
                 
             # Standardize
             X = np.array(self.X)
-            Y = self.scaler[0].fit_transform(np.array(self.Y).reshape(-1, 1)).squeeze()
+            Y = np.array(self.Y)
+            # Y = self.scaler[0].fit_transform(np.array(self.Y).reshape(-1, 1)).squeeze()
             self.model.fit(X, Y)
             self.model.train()
         return
