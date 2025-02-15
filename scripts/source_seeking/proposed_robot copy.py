@@ -98,12 +98,10 @@ class Robot(object): # python (x,y) therefore col index first, row next
         self.sent_samples = []
         
         ## GP
-        # self.gp = TorchGPModel()
         self.gp = GaussianProcessRegressor(
             kernel=kernel_initial(),
             n_restarts_optimizer=10
         )
-        
         self.estimation = None
         self.variance = None
         self.peaks_cord = None

@@ -13,7 +13,7 @@ from scipy.spatial import Voronoi, voronoi_plot_2d
 from proposed_robot import Robot
 
 ## Initilize environment
-from environment.environment_and_measurement import Environment, ROBOT_INIT_LOCATIONS_case, DEBUG  
+from environment.environment_and_measurement_7 import Environment, ROBOT_INIT_LOCATIONS_case, DEBUG  
 
 import argparse
 
@@ -264,8 +264,8 @@ if __name__ == '__main__':
     robo_num = 3
     robot_locations = ROBOT_INIT_LOCATIONS_case[robot_ini_loc_index]
 
-    save_img_path = "/home/clp/catkin_ws/src/source_seeking/record/3/DMSL/experiment_case_" + str(experiment_case) + ".png"
-    save_rmse_path = "/home/clp/catkin_ws/src/source_seeking/record/3/DMSL/experiment_case_" + str(experiment_case) + ".txt"
+    save_img_path = "/home/clp/catkin_ws/src/source_seeking/record/7/DMSL/experiment_case_" + str(experiment_case) + ".png"
+    save_rmse_path = "/home/clp/catkin_ws/src/source_seeking/record/7/DMSL/experiment_case_" + str(experiment_case) + ".txt"
 
     #############################################################
     ## Define the source field

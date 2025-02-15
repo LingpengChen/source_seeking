@@ -79,7 +79,7 @@ def main():
             if reach_target:
                 # print(beta)
                 queries = BO.find_next_query(iteration, beta=beta)
-                targets = queries                
+                targets = queries
                 # Use Hungarian algorithm to assign nearest targets for each agent
                 targets_indices = assign_targets_indices(robot_locations, targets)
                 # now we have new target
@@ -154,7 +154,6 @@ def main():
             clev1 = np.linspace(min(Y_obj), max(Y_obj),N)
             cp1 = axs[0].contourf(X_plot, Y_plot, np.array(Y_obj).reshape(X_plot.shape), clev1,  cmap = cm.coolwarm)
 
-            # targets = np.array(queries)
             targets = np.array(targets)
             found_sources = np.array(list(found_source_set))
             x_coords = targets[:, 0] 
@@ -186,7 +185,6 @@ def main():
             axs[1].set_ylabel('Y Label')
             axs[1].set_title('Mean value')
 
-           
             if end:
                 if Record:
                     plt.savefig(save_img_path)
