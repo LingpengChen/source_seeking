@@ -255,17 +255,18 @@ if __name__ == '__main__':
     parser.add_argument('source_index', type=int, help='choose the sources topology you want', nargs='?', default=1)
     # parser.add_argument('source_index', type=int, help='choose the sources topology you want',  nargs='?', default=1)
     args = parser.parse_args()
-    experiment_case = args.source_index
+    env_index = int(args.source_index)
         
-    env_index = int( experiment_case / 4 )
-    robot_ini_loc_index = experiment_case % 4
+    robot_ini_loc_index = 0
+    experiment_case = 2*env_index+robot_ini_loc_index
+    
     environment = Environment( env_index )
     
     robo_num = 3
     robot_locations = ROBOT_INIT_LOCATIONS_case[robot_ini_loc_index]
 
-    save_img_path = "/home/clp/catkin_ws/src/source_seeking/record/7/DMSL/experiment_case_" + str(experiment_case) + ".png"
-    save_rmse_path = "/home/clp/catkin_ws/src/source_seeking/record/7/DMSL/experiment_case_" + str(experiment_case) + ".txt"
+    save_img_path = "/home/clp/catkin_ws/src/source_seeking/record/7sources/DIAS/experiment_case_" + str(experiment_case) + ".png"
+    save_rmse_path = "/home/clp/catkin_ws/src/source_seeking/record/7sources/DIAS/experiment_case_" + str(experiment_case) + ".txt"
 
     #############################################################
     ## Define the source field
