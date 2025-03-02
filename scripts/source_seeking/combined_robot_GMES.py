@@ -7,8 +7,8 @@ from scipy.spatial import distance
 from controller.utils import convert_phi2phik, convert_phik2phi
 import numpy as np
 
-from environment.environment_and_measurement import Environment, DEBUG
-from environment.environment_and_measurement import CAM_FOV, SRC_MUT_D_THRESHOLD, LCB_THRESHOLD, STUCK_PTS_THRESHOLD, USE_BO, BO_RADIUS
+from environment.environment_and_measurement_7 import Environment, DEBUG
+from environment.environment_and_measurement_7 import CAM_FOV, SRC_MUT_D_THRESHOLD, LCB_THRESHOLD, STUCK_PTS_THRESHOLD, USE_BO, BO_RADIUS
 
 from sklearn.gaussian_process import GaussianProcessRegressor
 from sklearn.gaussian_process.kernels import RBF, WhiteKernel
@@ -165,10 +165,9 @@ class Robot(object): # python (x,y) therefore col index first, row next
         # 标记距离 [0,0] 机器人最近的格点为 1
         self.responsible_region = np.zeros(self.test_resolution)
         
-        for i, robot_index in enumerate(closest_robot):
-            if robot_index == self.index:
-                y, x = grid_points[i]
-                self.responsible_region[x, y] = 1
+        self.responsible_region = np.zeros(self.test_resolution)
+        mask = (closest_robot == self.index)
+        self.responsible_region[grid_points[mask, 1], grid_points[mask, 0]] = 1      
 
         # 3) exchange samples
         exchange_dictionary_X = {}
@@ -316,7 +315,6 @@ class Robot(object): # python (x,y) therefore col index first, row next
                 else: # select the peak of mean with highest LVB value as target 
                     index = np.argmax(peaks_LCB)
                     self.target = peaks_cord[index]
-                    # distance = cdist([self.trajectory[-1]], [peaks_cord[index]])[0][0]
                 active_sensing = False
             
             ## step 4-2: Conduct active sensing or source seeking !

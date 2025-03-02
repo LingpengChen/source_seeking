@@ -6,7 +6,7 @@ from matplotlib import cm
 from scipy.optimize import linear_sum_assignment
 from source_seeking_module.bayesian_optimization import BayesianOptimizationCentralized
 from source_seeking_module.benchmark_functions_2D import *
-from environment.environment_and_measurement import Environment, ROBOT_INIT_LOCATIONS_case
+from environment.environment_and_measurement_7 import Environment, ROBOT_INIT_LOCATIONS_case
 from combined_robot_GMES import Robot
 from typing import List
 from itertools import permutations
@@ -209,17 +209,20 @@ def print_progress_bar(index, iteration):
 if __name__ == '__main__':
     
     parser = argparse.ArgumentParser()
-    parser.add_argument('experiment_case', type=int, help='experiment_case', nargs='?', default=1)
+    parser.add_argument('env_index', type=int, help='choose the sources topology you want', nargs='?', default=1)
+    parser.add_argument('robot_ini_loc_index', type=int, help='choose the robot initial location',  nargs='?', default=1)
     args = parser.parse_args()
-    experiment_case = args.experiment_case
+    env_index = int(args.env_index)
+    robot_ini_loc_index = int(args.robot_ini_loc_index)
     
-    env_index = int( experiment_case / 4 )
-    robot_ini_loc_index = experiment_case % 4
+    experiment_case = len(ROBOT_INIT_LOCATIONS_case)*env_index+robot_ini_loc_index
+    print("Start experiment case_", experiment_case)
+    
     environment = Environment( env_index )
     
-    save_rmse_path = "/home/clp/catkin_ws/src/source_seeking/record/3/GMES/rmse" + str(experiment_case) + ".txt"
-    save_found_src_path = "/home/clp/catkin_ws/src/source_seeking/record/3/GMES/src" + str(experiment_case) + ".txt"
-    save_img_path = "/home/clp/catkin_ws/src/source_seeking/record/3/GMES/img" + str(experiment_case) + ".png"
+    save_rmse_path = "/home/clp/catkin_ws/src/source_seeking/record/7sources/GMES/rmse" + str(experiment_case) + ".txt"
+    save_found_src_path = "/home/clp/catkin_ws/src/source_seeking/record/7sources/GMES/src" + str(experiment_case) + ".txt"
+    save_img_path = "/home/clp/catkin_ws/src/source_seeking/record/7sources/GMES/img" + str(experiment_case) + ".png"
 
     n_workers = 3
     # robot_locations = np.array([[1,2], [2,2], [3, 1]], dtype=float)

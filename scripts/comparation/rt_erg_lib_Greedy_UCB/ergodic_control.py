@@ -2,7 +2,6 @@ import numpy as np
 from basis import Basis
 from barrier import Barrier
 from replay_buffer import ReplayBuffer
-from source_seeking.msg import Ck
 
 class RTErgodicControl(object):
 

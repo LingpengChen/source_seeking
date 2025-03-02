@@ -2,7 +2,6 @@
 from scipy.stats import multivariate_normal
 import numpy as np
 from matplotlib import pyplot as plt
-from mpl_toolkits.mplot3d import Axes3D
 
 DEBUG = False
 FIELD_SIZE = [10, 10]

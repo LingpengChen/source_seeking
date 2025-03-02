@@ -35,45 +35,6 @@ def find_peak(matrix):
     return np.array(local_maxima)[:, [1, 0]]
     # return np.array(local_maxima)
 
-# def find_peak(matrix):
-#     if len(indices) > 3:
-#         pass
-    
-#     flat_indices = np.argpartition(matrix.ravel(), -3)[-3:]
-
-#     # 将展平的索引转换回二维索引
-#     row_indices, col_indices = np.unravel_index(flat_indices, matrix.shape)
-#     # 打印前三大元素及其位置
- 
-#     maximums = [matrix[row_indices[i], col_indices[i]] for i in range(3)]
-#     argmaxs = [[row_indices[i], col_indices[i]] for i in range(3)]
-    
-#     print(argmaxs)
-#     # 使用最大滤波器找到每个位置的局部最大值
-#     local_max = maximum_filter(matrix, size=5) == matrix # [[F F][T F]]
-    
-#     # 获取局部最大值的坐标
-#     local_maxima_coords = np.argwhere(local_max)
-#     step_len = 1
-#         # 过滤出严格大于其周围邻居的局部最大值
-#     strict_local_maxima = []
-#     for i, j in local_maxima_coords:
-#         if i > step_len and j > step_len and i < matrix.shape[0] - step_len and j < matrix.shape[1] - step_len:
-#             neighbors = [matrix[i-step_len, j-step_len], matrix[i-step_len, j], matrix[i-step_len, j+step_len],
-#                         matrix[i, j-step_len],                 matrix[i, j+step_len],
-#                         matrix[i+step_len, j-step_len], matrix[i+step_len, j], matrix[i+step_len, j+step_len]]
-#             if all(matrix[i, j] > neighbor for neighbor in neighbors):
-#                 strict_local_maxima.append([i,j])
-#     print(strict_local_maxima)                
-#     if (len(strict_local_maxima)<3):
-#         for argmax in argmaxs:
-#             if argmax not in strict_local_maxima:
-#                 strict_local_maxima.append(argmax)
-#                 if len(strict_local_maxima) == 3:
-#                     break
-        
-#     return np.array(strict_local_maxima)[:, [1, 0]]
-
 
 
 class bayesian_optimization:

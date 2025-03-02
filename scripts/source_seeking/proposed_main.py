@@ -252,14 +252,15 @@ def print_progress_bar(index, iteration):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('source_index', type=int, help='choose the sources topology you want', nargs='?', default=1)
-    # parser.add_argument('source_index', type=int, help='choose the sources topology you want',  nargs='?', default=1)
+    parser.add_argument('env_index', type=int, help='choose the sources topology you want', nargs='?', default=1)
+    parser.add_argument('robot_ini_loc_index', type=int, help='choose the robot initial location',  nargs='?', default=1)
     args = parser.parse_args()
-    env_index = int(args.source_index)
+    env_index = int(args.env_index)
+    robot_ini_loc_index = int(args.robot_ini_loc_index)
+            
+    experiment_case = len(ROBOT_INIT_LOCATIONS_case)*env_index+robot_ini_loc_index
+    print("Start experiment case_", experiment_case)
         
-    robot_ini_loc_index = 0
-    experiment_case = 2*env_index+robot_ini_loc_index
-    
     environment = Environment( env_index )
     
     robo_num = 3

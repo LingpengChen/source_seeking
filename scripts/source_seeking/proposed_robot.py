@@ -98,12 +98,10 @@ class Robot(object): # python (x,y) therefore col index first, row next
         self.sent_samples = []
         
         ## GP
-        # self.gp = TorchGPModel()
         self.gp = GaussianProcessRegressor(
             kernel=kernel_initial(),
             n_restarts_optimizer=10
         )
-        
         self.estimation = None
         self.variance = None
         self.peaks_cord = None
@@ -152,10 +150,9 @@ class Robot(object): # python (x,y) therefore col index first, row next
         # 标记距离 [0,0] 机器人最近的格点为 1
         self.responsible_region = np.zeros(self.test_resolution)
         
-        for i, robot_index in enumerate(closest_robot):
-            if robot_index == self.index:
-                y, x = grid_points[i]
-                self.responsible_region[x, y] = 1
+        self.responsible_region = np.zeros(self.test_resolution)
+        mask = (closest_robot == self.index)
+        self.responsible_region[grid_points[mask, 1], grid_points[mask, 0]] = 1      
 
         # 3) exchange samples
         exchange_dictionary_X = {}
